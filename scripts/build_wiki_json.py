@@ -24,9 +24,24 @@ SIN_PROCESAR = [
 
 
 def main(bundle, salida):
-    docs = []
+    docs, fichas = [], []
     for ruta, fm, body in c.documentos_del_bundle(bundle):
         did = os.path.splitext(os.path.basename(ruta))[0]
+        if fm.get("type", c.TIPO_VIDEO) != c.TIPO_VIDEO:
+            secs, cur = [], None
+            for line in body.splitlines():
+                if line.startswith("## "):
+                    cur = {"titulo": line[3:].strip(), "lineas": []}; secs.append(cur); continue
+                if cur is not None:
+                    cur["lineas"].append(line)
+            for s_ in secs:
+                s_["texto"] = "\n".join(s_.pop("lineas")).strip()
+            fichas.append({"id": did, "tipo": fm.get("type"), "titulo": fm.get("title", did),
+                           "descripcion": fm.get("description"), "estado": fm.get("estado", "borrador"),
+                           "dominio": fm.get("dominio"), "valida": fm.get("valida"),
+                           "contradicciones": int(fm.get("contradicciones", 0) or 0),
+                           "ultima_fuente": fm.get("ultima_fuente"), "secciones": secs})
+            continue
         temas = c.temas_de(body)
         secs, cur, h2 = [], None, None
         for line in body.splitlines():
@@ -56,9 +71,13 @@ def main(bundle, salida):
             m = re.match(r"^\| (.+?) \| (.+?) \| (.*?) \|$", line)
             if m and not line.startswith("| Lo que dice") and not line.startswith("|---") and '"' in m.group(1):
                 glos.append({"audio": m.group(1), "es": m.group(2), "nota": m.group(3)})
-    data = {"prototipo": True, "documentos": docs, "glosario": glos, "sin_procesar": SIN_PROCESAR}
+    pend = os.path.join(bundle, "_grabaciones_sin_procesar.txt")
+    sin_procesar = [l.strip() for l in open(pend, encoding="utf-8") if l.strip() and not l.startswith("#")] \
+        if os.path.exists(pend) else SIN_PROCESAR
+    fichas.sort(key=lambda f: (f["tipo"], f["titulo"]))
+    data = {"prototipo": True, "documentos": docs, "fichas": fichas, "glosario": glos, "sin_procesar": sin_procesar}
     json.dump(data, open(salida, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"{salida}: {len(docs)} documentos, {len(glos)} filas de glosario")
+    print(f"{salida}: {len(docs)} documentos, {len(fichas)} fichas, {len(glos)} filas de glosario")
 
 
 if __name__ == "__main__":

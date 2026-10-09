@@ -41,7 +41,9 @@ Reglas del contrato:
 
 La wiki es un **prototipo con datos ficticios** (personas, empresa, proyecto de origen, tablas, tickets y fechas inventados).
 
-1. **Bundle OKF**: carpeta `wiki/` de este repositorio (`index.md`, documentos `*.md`, `_PLANTILLA_Y_GLOSARIO.md`).
+1. **Bundle OKF**: carpeta `wiki/` de este repositorio (`index.md`, documentos de video `*.md`, fichas consolidadas `fichas/*.md`, `_PLANTILLA_Y_GLOSARIO.md`).
+   - Las **fichas** (`Término`, `Regla de negocio`, `Caso especial`) reúnen lo dicho en todos los videos y tienen prioridad. Sus citas tienen la forma `[Charla 4 · 16:39](../archivo-del-video.md)`: el minuto y el video de la cita son los que se informan en "Dónde se encontró".
+   - Si una ficha señala una contradicción, se responde con la versión vigente y se aclara que hubo un cambio (regla del piloto: ante contradicción prevalece la Charla 6; si no participa, la fuente más reciente, a confirmar).
 2. **Motor de búsqueda**: `asistente/consulta_okf.py`. Python 3 sin dependencias.
 
 ## Procedimiento (orquestador)

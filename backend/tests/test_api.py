@@ -22,7 +22,7 @@ def test_salud(cliente, contrato):
     r = cliente.get("/api/salud")
     assert r.status_code == 200
     cuerpo = contrato("Salud", r.json())
-    assert cuerpo["modo_agentes"] == "simulacion" and cuerpo["videos"] == 4
+    assert cuerpo["modo_agentes"] == "simulacion" and cuerpo["videos"] == 4 and cuerpo["fichas"] == 15
 
 
 # ------------------------------------------------------------------ preguntas de control
@@ -152,3 +152,44 @@ def test_links_de_videos_y_url_al_segundo(cliente, contrato):
     res = cliente.post("/api/consultas", json={"pregunta": VALIDACION}, headers=ROL("lector")).json()
     cita = next(c for c in res["citas"] if c["video_id"] == vid)
     assert "nav=" in cita["url_video"]
+
+
+# ------------------------------------------------------------------ fichas consolidadas
+def test_listado_y_detalle_de_fichas(cliente, contrato):
+    fichas = cliente.get("/api/wiki/fichas", headers=ROL("lector")).json()["fichas"]
+    assert len(fichas) == 15
+    for f in fichas:
+        contrato("FichaResumen", f)
+    tipos = {f["tipo"] for f in fichas}
+    assert tipos == {"Término", "Regla de negocio", "Caso especial"}
+    reglas = cliente.get("/api/wiki/fichas", params={"tipo": "Regla de negocio"}, headers=ROL("lector")).json()["fichas"]
+    assert reglas and all(f["tipo"] == "Regla de negocio" for f in reglas)
+    ref = contrato("Ficha", cliente.get("/api/wiki/fichas/termino-ref-code-y-record-group", headers=ROL("lector")).json())
+    assert ref["contradicciones"] == 2
+    texto = next(s["texto"] for s in ref["secciones"] if s["titulo"] == "Contradicciones")
+    assert "Vigente: Charla 6" in texto  # regla del piloto: ante contradicción prevalece la charla 6
+    assert cliente.get("/api/wiki/fichas/no-existe", headers=ROL("lector")).status_code == 404
+
+
+def test_todas_las_citas_de_las_fichas_existen_en_su_video(cliente):
+    w = cliente.app.state.wiki
+    patron = re.compile(r"·\s*(\d{1,2}:\d{2}(?::\d{2})?)\]\(\.\./([\w-]+)\.md\)")
+    total = 0
+    for f in w.fichas.values():
+        for s in f.secciones:
+            for minuto, video in patron.findall(s.texto):
+                total += 1
+                assert w.minuto_valido(video, minuto), f"{f.id}: {video} {minuto} no existe"
+    assert total > 300
+
+
+def test_las_respuestas_priorizan_las_fichas(cliente, contrato):
+    res = contrato("ResultadoConsulta", cliente.post("/api/consultas", json={"pregunta": "¿Qué es un grupo de negocio?"},
+                                                     headers=ROL("lector")).json())
+    assert res["citas"] and all(c["ficha_id"] == "termino-grupo-de-negocio" for c in res["citas"])
+    # la cita apunta al video de origen, no a la ficha
+    assert all(c["video_id"] in cliente.app.state.wiki.documentos for c in res["citas"])
+
+
+def test_indice_cuenta_fichas(cliente):
+    assert cliente.get("/api/wiki/indice", headers=ROL("lector")).json()["total_fichas"] == 15

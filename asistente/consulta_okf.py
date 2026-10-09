@@ -37,6 +37,10 @@ puede pueden debo debe deben tengo tenemos quiero necesito cosa caso manera form
 """.split())
 
 TS_RE = re.compile(r"\[(\d{1,2}:\d{2}(?::\d{2})?)")
+# Cita dentro de una ficha consolidada: [Charla 4 · 16:39](../archivo-del-video.md)
+CITA_RE = re.compile(r"·\s*(\d{1,2}:\d{2}(?::\d{2})?)\]\(([^)\s#]+?\.md)")
+TIPO_VIDEO = "Fuente de video"
+SECCIONES_NO_CITABLES = ("pendientes", "fuentes", "relacionados")
 SECTION_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+?)\s*(?:\((\d{1,2}:\d{2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}:\d{2}(?::\d{2})?)\))?\s*$")
 TEMA_ROW_RE = re.compile(r"^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|\s*(\w+)\s*\|\s*$")
 
@@ -151,6 +155,7 @@ def fragmentos(ruta, fm, cuerpo, carpeta):
     filas de términos y reglas sueltas. Cada fragmento lleva su timestamp."""
     temas = temas_de(cuerpo)
     rel = os.path.relpath(ruta, carpeta).replace(os.sep, "/")
+    es_ficha = fm.get("type", TIPO_VIDEO) != TIPO_VIDEO
     frs = []
     seccion, num, ts_sec, dominio = None, None, None, fm.get("dominio", "")
     heading = None
@@ -164,11 +169,21 @@ def fragmentos(ruta, fm, cuerpo, carpeta):
         buffer.clear()
         if len(texto) < 25:
             return
-        ts = TS_RE.search(texto)
-        if not ts and texto.startswith("|"):
-            ts = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", texto.split("|")[-2] if texto.count("|") > 2 else "")
-        ts_val = ts.group(1) if ts else ts_sec
+        cita_doc = rel
+        if es_ficha:
+            # En una ficha, el minuto y el video salen de la primera cita del fragmento.
+            c = CITA_RE.search(texto)
+            ts_val = c.group(1) if c else None
+            if c:
+                destino = os.path.normpath(os.path.join(os.path.dirname(ruta), c.group(2)))
+                cita_doc = os.path.relpath(destino, carpeta).replace(os.sep, "/")
+        else:
+            ts = TS_RE.search(texto)
+            if not ts and texto.startswith("|"):
+                ts = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", texto.split("|")[-2] if texto.count("|") > 2 else "")
+            ts_val = ts.group(1) if ts else ts_sec
         frs.append({
+            "es_ficha": es_ficha, "tipo_doc": fm.get("type", TIPO_VIDEO), "cita_doc": cita_doc,
             "doc": rel, "titulo": fm.get("title", rel), "resource": fm.get("resource"),
             "fecha": fm.get("timestamp"), "seccion": seccion or bloque_h2,
             "anchor": slug(heading) if heading else "",
@@ -210,7 +225,7 @@ def fragmentos(ruta, fm, cuerpo, carpeta):
     volcar()
     # Los "Pendientes" no son respuestas: se marcan para excluirlos.
     for f in frs:
-        f["es_pendiente"] = (f["tipo_bloque"] or "").lower().startswith("pendientes")
+        f["es_pendiente"] = (f["tipo_bloque"] or "").lower().startswith(SECCIONES_NO_CITABLES)
     return frs
 
 
@@ -224,6 +239,8 @@ def buscar(carpeta, pregunta, top=6):
             if f["es_pendiente"] or not f["timestamp"]:
                 continue
             f["_tok"] = tokens(f["texto"]) + tokens(f["seccion"] or "") * 2
+            if f["es_ficha"]:
+                f["_tok"] += tokens(f["titulo"]) * 2
             corpus.append(f)
 
     q = tokens(pregunta)
@@ -251,6 +268,10 @@ def buscar(carpeta, pregunta, top=6):
         cobertura = sum(1 for t in qset if tf[t]) / len(qset)
         if f["es_regla"]:
             s *= 1.15
+        if f["es_ficha"]:
+            s *= 1.25  # las fichas consolidadas tienen prioridad sobre los fragmentos de video
+            if f["seccion"] in ("Definición", "Regla", "Situación"):
+                s *= 1.2  # el núcleo de la ficha antes que el detalle
         puntuados.append((s, cobertura, f))
 
     puntuados.sort(key=lambda x: -x[0])
@@ -268,6 +289,7 @@ def buscar(carpeta, pregunta, top=6):
             "video": f["resource"], "fecha_video": f["fecha"],
             "seccion": f["seccion"], "dominio": f["dominio"],
             "timestamp": a_hhmmss(f["timestamp"]), "texto": f["texto"],
+            "es_ficha": f["es_ficha"], "tipo": f["tipo_doc"], "cita_doc": f["cita_doc"],
         })
         if len(resultados) >= top:
             break
@@ -296,24 +318,43 @@ def buscar(carpeta, pregunta, top=6):
 # ----------------------------------------------------------------- index.md
 
 def indexar(carpeta):
-    docs = documentos_del_bundle_sin_index(carpeta)
+    todos = documentos_del_bundle_sin_index(carpeta)
+    videos = [d for d in todos if d[1].get("type") == TIPO_VIDEO]
+    fichas = [d for d in todos if d[1].get("type") != TIPO_VIDEO]
     lineas = [
         "---",
         "type: Índice",
         "title: Wiki viva de consulta de terminología técnica y funcional",
-        "description: Punto de entrada OKF. Lista las fuentes (videos procesados) y sus temas con rangos de tiempo para navegar por divulgación progresiva.",
+        "description: Punto de entrada OKF. Lista las fichas consolidadas y las fuentes (videos procesados) con sus temas y rangos de tiempo, para navegar por divulgación progresiva.",
         "tags: [indice]",
         "---",
         "",
         "# Wiki viva de consulta de terminología técnica y funcional",
         "",
-        "Cómo navegar: leer este índice, elegir la fuente y el tema, y seguir el link al documento.",
-        "Glosario de jerga y errores de transcripción: [_PLANTILLA_Y_GLOSARIO.md](_PLANTILLA_Y_GLOSARIO.md).",
-        "",
-        "## Fuentes de video",
+        "Cómo navegar: empezar por las fichas (reúnen lo dicho en todos los videos sobre un concepto) y,",
+        "para el detalle, ir a la fuente y al tema. Glosario de jerga y errores de transcripción:",
+        "[_PLANTILLA_Y_GLOSARIO.md](_PLANTILLA_Y_GLOSARIO.md).",
         "",
     ]
-    for ruta, fm, cuerpo in sorted(docs, key=lambda d: d[1].get("timestamp") or "9999"):
+    if fichas:
+        lineas += ["## Fichas consolidadas", ""]
+        for tipo in ("Término", "Regla de negocio", "Caso especial"):
+            grupo = sorted((d for d in fichas if d[1].get("type") == tipo), key=lambda d: d[1].get("title", ""))
+            otros = [] if tipo != "Caso especial" else sorted(
+                (d for d in fichas if d[1].get("type") not in ("Término", "Regla de negocio", "Caso especial")),
+                key=lambda d: d[1].get("title", ""))
+            if not grupo and not otros:
+                continue
+            plural = {"Término": "Términos", "Regla de negocio": "Reglas de negocio", "Caso especial": "Casos especiales"}[tipo]
+            lineas += [f"### {plural}", "",
+                       "| Ficha | Descripción | Estado | Contradicciones | Última fuente |", "|---|---|---|---|---|"]
+            for ruta, fm, _ in grupo + otros:
+                rel = os.path.relpath(ruta, carpeta).replace(os.sep, "/")
+                lineas.append(f"| [{fm.get('title', rel)}]({rel}) | {fm.get('description', '')} | {fm.get('estado', '')} | "
+                              f"{fm.get('contradicciones', '0')} | {fm.get('ultima_fuente', '')} |")
+            lineas.append("")
+    lineas += ["## Fuentes de video", ""]
+    for ruta, fm, cuerpo in sorted(videos, key=lambda d: d[1].get("timestamp") or "9999"):
         rel = os.path.relpath(ruta, carpeta).replace(os.sep, "/")
         fecha = fm.get("timestamp") or "s/f"
         lineas += [

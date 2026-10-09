@@ -81,6 +81,29 @@ class Documento:
         return None
 
 
+@dataclass
+class Ficha:
+    id: str
+    tipo: str  # Término | Regla de negocio | Caso especial
+    titulo: str
+    descripcion: str | None
+    dominio: str
+    estado: str
+    valida: str | None
+    contradicciones: int
+    ultima_fuente: str | None
+    aliases: list[str] = field(default_factory=list)
+    secciones: list[Seccion] = field(default_factory=list)
+
+    def resumen(self) -> dict:
+        return {"id": self.id, "tipo": self.tipo, "titulo": self.titulo, "descripcion": self.descripcion,
+                "dominio": self.dominio, "estado": self.estado, "valida": self.valida,
+                "contradicciones": self.contradicciones, "ultima_fuente": self.ultima_fuente, "aliases": self.aliases}
+
+
+TIPO_VIDEO = "Fuente de video"
+_SECCIONES_FICHA_CONTEXTO = ("Definición", "Regla", "Situación", "Detalle", "Contradicciones")
+
 _TIPO_H2 = {"Resumen": "resumen", "Términos detectados": "terminos", "Reglas y casos especiales detectados": "reglas"}
 
 
@@ -90,6 +113,7 @@ class Wiki:
         self.okf = cargar_motor(Path(asistente_dir))
         self.titulo = "Wiki viva"
         self.documentos: dict[str, Documento] = {}
+        self.fichas: dict[str, Ficha] = {}
         self.jerga: list[dict] = []
         self.sin_procesar: list[str] = []
         self.cargar()
@@ -101,9 +125,12 @@ class Wiki:
         if idx.exists():
             fm, _ = okf.leer_frontmatter(idx.read_text(encoding="utf-8"))
             self.titulo = fm.get("title", self.titulo)
-        docs = {}
+        docs, fichas = {}, {}
         for ruta, fm, cuerpo in okf.documentos_del_bundle(str(self.dir)):
             did = Path(ruta).stem
+            if fm.get("type", TIPO_VIDEO) != TIPO_VIDEO:
+                fichas[did] = self._cargar_ficha(did, fm, cuerpo)
+                continue
             temas = okf.temas_de(cuerpo)
             secciones: list[Seccion] = []
             cur, lineas = None, []
@@ -137,6 +164,7 @@ class Wiki:
             doc.segundos_validos = {a_segundos(t) for s in secciones for t in TS_RE.findall(s.texto)}
             docs[did] = doc
         self.documentos = docs
+        self.fichas = fichas
 
         self.jerga = []
         glos = self.dir / "_PLANTILLA_Y_GLOSARIO.md"
@@ -148,6 +176,28 @@ class Wiki:
         pend = self.dir / "_grabaciones_sin_procesar.txt"
         self.sin_procesar = [l.strip() for l in pend.read_text(encoding="utf-8").splitlines()
                              if l.strip() and not l.startswith("#")] if pend.exists() else []
+
+    @staticmethod
+    def _cargar_ficha(fid: str, fm: dict, cuerpo: str) -> Ficha:
+        secciones, cur, lineas = [], None, []
+        for linea in cuerpo.splitlines() + ["## __fin__"]:
+            if linea.startswith("## "):
+                if cur is not None:
+                    cur.texto = "\n".join(lineas).strip()
+                cur, lineas = Seccion(None, linea[3:].strip(), "ficha", ""), []
+                if cur.titulo != "__fin__":
+                    secciones.append(cur)
+                continue
+            if cur is not None:
+                lineas.append(linea)
+        try:
+            contr = int(fm.get("contradicciones", 0))
+        except (TypeError, ValueError):
+            contr = 0
+        aliases = fm.get("aliases") if isinstance(fm.get("aliases"), list) else []
+        return Ficha(fid, fm.get("type", ""), fm.get("title", fid), fm.get("description"), fm.get("dominio", ""),
+                     fm.get("estado", "borrador"), fm.get("valida"), contr, fm.get("ultima_fuente"),
+                     [a.strip('"') for a in aliases], secciones)
 
     # ------------------------------------------------------------- consultas
     def terminos(self) -> list[dict]:
@@ -172,9 +222,13 @@ class Wiki:
         res = self.okf.buscar(str(self.dir), pregunta, top=top)
         hits = []
         for r in res.get("resultados", []):
-            did = r["archivo"].split("#")[0].rsplit("/", 1)[-1][:-3]
-            if did in self.documentos and r.get("timestamp"):
-                hits.append({**r, "video_id": did, "segundos": a_segundos(r["timestamp"])})
+            origen = r["archivo"].split("#")[0].rsplit("/", 1)[-1][:-3]
+            video = r.get("cita_doc", r["archivo"]).split("#")[0].rsplit("/", 1)[-1][:-3]
+            ficha_id = origen if r.get("es_ficha") else None
+            if ficha_id and ficha_id not in self.fichas:
+                continue
+            if video in self.documentos and r.get("timestamp"):
+                hits.append({**r, "video_id": video, "ficha_id": ficha_id, "segundos": a_segundos(r["timestamp"])})
         return hits
 
     def contexto(self, hits: list[dict], maximo: int = 6) -> list[tuple[Documento, Seccion]]:
@@ -182,6 +236,12 @@ class Wiki:
         video, se agregan todos sus temas (la respuesta suele estar repartida en temas contiguos)."""
         vistos, out, por_doc = set(), [], {}
         for h in hits:
+            if h.get("ficha_id"):  # una ficha aporta todas sus secciones de contenido
+                f = self.fichas[h["ficha_id"]]
+                for sec in f.secciones:
+                    if sec.titulo in _SECCIONES_FICHA_CONTEXTO and (f.id, sec.titulo) not in vistos:
+                        vistos.add((f.id, sec.titulo)); out.append((f, sec))
+                continue
             d = self.documentos[h["video_id"]]
             s = next((x for x in d.secciones if x.titulo == h["seccion"]), None)
             if s is None:

@@ -22,6 +22,7 @@ wiki/                       Bundle OKF (punto de entrada: wiki/index.md)
   index.md                  Índice: videos, temas y rangos de tiempo
   _PLANTILLA_Y_GLOSARIO.md  Formato de los documentos y glosario de jerga / errores de transcripción
   *.md                      Un documento por video (type: Fuente de video)
+  fichas/                   Fichas consolidadas: Término, Regla de negocio, Caso especial (piloto: 15)
 asistente/
   consulta_okf.py           Motor de búsqueda OKF (Python 3, sin dependencias)
   SKILL.md                  Instrucciones del asistente multiagente (habilidad de Claude)
@@ -37,6 +38,17 @@ frontend/
 docs/api/openapi.yaml       Contrato de la API
 docker-compose.yml          Levanta backend + demo en local
 ```
+
+## Fichas consolidadas (piloto)
+
+Además de un documento por video, la wiki tiene **fichas** que reúnen todo lo que se dijo sobre un concepto en los distintos videos. Hay tres tipos: `Término`, `Regla de negocio` y `Caso especial`.
+
+- Cada afirmación cita su video y su minuto: `[Charla 4 · 16:39](../charla-tecnica-modernizacion-modulos-4.md)`.
+- Las contradicciones entre fuentes quedan señaladas con la versión vigente. Regla del piloto: prevalece la Charla 6; si no participa, la fuente más reciente, a confirmar.
+- Todas se crean en `borrador` hasta que un referente las valide.
+- El buscador, el backend y el portal las priorizan sobre los fragmentos de video.
+
+Formato y reglas: [`wiki/fichas/_PLANTILLA_FICHAS.md`](wiki/fichas/_PLANTILLA_FICHAS.md).
 
 ## Uso rápido
 

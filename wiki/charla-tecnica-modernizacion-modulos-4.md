@@ -3,6 +3,7 @@ type: Fuente de video
 title: Charla Técnica Modernización de módulos 4
 description: Sesión práctica sobre la migración de la tabla ?XT_ORIGEN_RECAUDO desde Forms al sistema parametrizable, con permisos, Red Code/Ref Code, formatos (Case Restriction), type y paquete, relaciones, campo query, paso 4 de parametrización, vistas, listas de valores y pase de desa a test y a prod.
 resource: "Transcripciones/Charla tecnica modernizacion 04.docx"
+timestamp: 2026-04-02
 duracion: "1:54:00"
 participantes: []
 dominio: ambos

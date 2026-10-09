@@ -3,6 +3,7 @@ type: Fuente de video
 title: Charla Técnica Modernización de módulos 6 — Usuario de auditoría, validadores por campo y validación de póliza
 description: Sesión de revisión sobre una pantalla migrada desde Forms (ramo/póliza/certificado, saldo, estado). Se discute dónde asignar el usuario que hace la transacción en el insert y cómo armar validadores por campo (plantilla "validar campo" llamada desde un único procedimiento "validar registro") que robustecen la validación de póliza, estatus y saldo.
 resource: "Transcripciones/Charla tecnica modernizacion 06.docx"
+timestamp: 2026-04-23
 duracion: "0:42:30"
 participantes: []
 dominio: tecnico

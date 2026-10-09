@@ -79,7 +79,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
     @app.get("/api/salud")
     def salud(request: Request):
         return {"estado": "ok", "modo_agentes": request.app.state.orquestador.agentes.modo,
-                "videos": len(request.app.state.wiki.documentos), "version": VERSION}
+                "videos": len(request.app.state.wiki.documentos), "fichas": len(request.app.state.wiki.fichas),
+                "version": VERSION}
 
     # ------------------------------------------------------------- consultas
     @app.post("/api/consultas")
@@ -131,7 +132,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
         exigir(u, "lector")
         links = rp.links()
         videos = sorted(w.documentos.values(), key=lambda d: d.fecha or "0000", reverse=True)
-        return {"titulo": w.titulo, "videos": [video_resumen(d, links) for d in videos], "sin_procesar": w.sin_procesar}
+        return {"titulo": w.titulo, "videos": [video_resumen(d, links) for d in videos], "sin_procesar": w.sin_procesar,
+                "total_fichas": len(w.fichas)}
 
     @app.get("/api/wiki/videos/{video_id}")
     def video(video_id: str, w: Wiki = Depends(wiki), rp: Repositorio = Depends(repo), u: Usuario = Depends(usuario_actual)):
@@ -143,6 +145,21 @@ def crear_app(config: Config | None = None) -> FastAPI:
         out["secciones"] = [{"numero": s.numero, "titulo": s.titulo, "tipo": s.tipo, "desde": hhmmss(s.desde),
                              "hasta": hhmmss(s.hasta), "dominio": s.dominio, "texto": s.texto} for s in d.secciones]
         return out
+
+    @app.get("/api/wiki/fichas")
+    def listar_fichas(tipo: Literal["Término", "Regla de negocio", "Caso especial"] | None = None,
+                      w: Wiki = Depends(wiki), u: Usuario = Depends(usuario_actual)):
+        exigir(u, "lector")
+        fichas = sorted(w.fichas.values(), key=lambda f: (f.tipo, normalizar(f.titulo)))
+        return {"fichas": [f.resumen() for f in fichas if not tipo or f.tipo == tipo]}
+
+    @app.get("/api/wiki/fichas/{ficha_id}")
+    def ver_ficha(ficha_id: str, w: Wiki = Depends(wiki), u: Usuario = Depends(usuario_actual)):
+        exigir(u, "lector")
+        f = w.fichas.get(ficha_id)
+        if not f:
+            raise ApiError(404, "no_encontrado", "No existe esa ficha.")
+        return {**f.resumen(), "secciones": [{"titulo": s.titulo, "texto": s.texto} for s in f.secciones]}
 
     @app.get("/api/glosario")
     def glosario(q: str | None = None, w: Wiki = Depends(wiki), u: Usuario = Depends(usuario_actual)):

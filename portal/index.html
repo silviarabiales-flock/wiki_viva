@@ -121,6 +121,18 @@ details.tema summary .tt{flex:1;min-width:0}
 .pend{background:var(--sunk);border-radius:var(--r);padding:12px 16px;font-size:.88rem}
 .pend ul{columns:2 240px;margin:.4rem 0 0;padding-left:1.1rem;color:var(--muted)}
 
+/* Fichas */
+details.ficha summary{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;cursor:pointer;list-style:none}
+details.ficha summary::-webkit-details-marker{display:none}
+details.ficha .tt{display:flex;flex-direction:column;gap:2px;min-width:0}
+details.ficha .desc{font-size:.86rem;color:var(--muted)}
+details.ficha .badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;flex:none;max-width:45%}
+details.ficha .estado{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;padding:.05rem .45rem;border-radius:999px;background:var(--sunk);color:var(--muted)}
+details.ficha .warn{font-size:.72rem;padding:.05rem .45rem;border-radius:999px;border:1px solid var(--warn);color:var(--warn);white-space:nowrap}
+details.ficha .tema-body{padding:8px 0 4px}
+h3.fsec{font:600 .78rem var(--f-body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:14px 0 4px}
+.cita{white-space:nowrap}.cita-src{font-size:.75rem;color:var(--muted);margin:0 .25rem 0 .15rem}
+@media (max-width:520px){details.ficha summary{flex-direction:column}details.ficha .badges{max-width:none;justify-content:flex-start}}
 /* Glosario */
 .search{width:100%;font:400 .95rem var(--f-body);padding:.55rem .8rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);margin-bottom:12px}
 .gl{display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
@@ -156,6 +168,7 @@ h2.sec{font-family:var(--f-display);font-weight:500;font-size:1.05rem;margin:20p
 
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="consultar" id="t-consultar">Consultar</button>
+    <button role="tab" aria-selected="false" data-tab="fichas" id="t-fichas">Fichas</button>
     <button role="tab" aria-selected="false" data-tab="explorar" id="t-explorar">Explorar videos</button>
     <button role="tab" aria-selected="false" data-tab="glosario" id="t-glosario">Glosario</button>
     <button role="tab" aria-selected="false" data-tab="huecos" id="t-huecos">Sin respuesta<span class="count" id="gapcount"></span></button>
@@ -183,6 +196,7 @@ h2.sec{font-family:var(--f-display);font-weight:500;font-size:1.05rem;margin:20p
     <div class="history" id="history" hidden><span class="label">Consultas de esta sesión</span><ul id="histlist"></ul></div>
   </section>
 
+  <section id="p-fichas" role="tabpanel" hidden></section>
   <section id="p-explorar" role="tabpanel" hidden></section>
   <section id="p-glosario" role="tabpanel" hidden>
     <input class="search" id="gsearch" type="search" placeholder="Buscar un término o cómo suena en el audio (ej.: Jason, Red Code)">
@@ -253,6 +267,12 @@ const noAcc = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 function stem(t){ for (const s of SUF){ if (t.length - s.length >= 4 && t.endsWith(s)){ t = t.slice(0, -s.length); break; } } return t.slice(0,7); }
 function toks(text){ return (noAcc(String(text).toLowerCase()).match(/[a-z0-9_]+/g) || []).filter(w => w.length > 1 && !STOP.has(w)).map(stem); }
 const TS_RE = /(\d{1,2}:\d{2}(?::\d{2})?)/;
+const CITA_RE = /·\s*(\d{1,2}:\d{2}(?::\d{2})?)\]\(\.\.\/([\w-]+)\.md\)/;
+const CITA_RE_G = /\[([^\]]*?)·\s*(\d{1,2}:\d{2}(?::\d{2})?)\]\(\.\.\/([\w-]+)\.md\)/g;
+const FICHA_CITABLES = ["Definición", "Regla", "Situación", "Detalle", "Contradicciones"];
+const FICHA_NUCLEO = ["Definición", "Regla", "Situación"];
+// En el texto que leen los agentes, las citas de las fichas pasan a [doc:<video> m:ss].
+const fichaParaAgente = txt => txt.replace(CITA_RE_G, (m, lab, ts, doc) => `[doc:${doc} ${ts}]`).replace(/\[([^\]]+)\]\([\w-]+\.md\)/g, "$1");
 
 function buildIndex(){
   const chunks = [];
@@ -268,6 +288,20 @@ function buildIndex(){
         const ts = m ? m[1] : s.desde; if (!ts) continue;
         chunks.push({doc:d.id, sec:s, ts, text:t, tok: toks(t).concat(toks(s.titulo), toks(s.titulo)),
           regla: /^>?\s*\*\*(Regla|Caso)/.test(t)});
+      }
+    }
+  }
+  // Fichas consolidadas: el minuto y el video salen de la primera cita de cada fragmento.
+  for (const f of (WIKI.fichas || [])){
+    for (const s of f.secciones){
+      if (!FICHA_CITABLES.includes(s.titulo)) continue;
+      const sec = {titulo: `${f.titulo} › ${s.titulo}`, texto: fichaParaAgente(s.texto), ficha: f.id, nucleo: FICHA_NUCLEO.includes(s.titulo)};
+      const parts = s.texto.split(/\n\s*\n|\n(?=- |> )/);
+      for (const p of parts){
+        const t = p.trim(); if (t.length < 25) continue;
+        const m = t.match(CITA_RE); if (!m) continue;
+        chunks.push({doc: m[2], ts: m[1], sec, text: t, ficha: f.id,
+          tok: toks(t).concat(toks(f.titulo), toks(f.titulo), toks(s.titulo)), regla: false});
       }
     }
   }
@@ -287,6 +321,7 @@ function search(q){
     let s = 0, hit = 0;
     for (const t of qt){ const f = tf.get(t)||0; if (f){ hit++; s += idf(t) * f * (k1+1) / (f + k1*(1-b+b*c.tok.length/avg)); } }
     if (c.regla) s *= 1.15;
+    if (c.ficha) s *= c.sec.nucleo ? 1.5 : 1.25; // las fichas consolidadas tienen prioridad
     return {c, s, cov: hit / qt.length};
   }).sort((a,b) => b.s - a.s);
   const best = scored.length ? scored[0].s : 0;
@@ -295,14 +330,22 @@ function search(q){
 function sectionsFor(hits){
   const map = new Map(), byDoc = new Map();
   for (const h of hits){
-    const key = h.c.doc + "|" + h.c.sec.titulo;
+    const key = (h.c.ficha || h.c.doc) + "|" + h.c.sec.titulo;
     if (!map.has(key)) map.set(key, {doc:h.c.doc, sec:h.c.sec, score:h.s});
     byDoc.set(h.c.doc, (byDoc.get(h.c.doc) || new Set()).add(h.c.sec.titulo));
   }
   let out = [...map.values()].sort((a,b)=>b.score-a.score).slice(0, 6);
+  for (const fid of [...new Set(hits.filter(h => h.c.ficha).map(h => h.c.ficha))].reverse()){ // la ficha más relevante queda primera
+    const f = WIKI.fichas.find(x => x.id === fid);
+    for (const s of f.secciones.filter(x => FICHA_CITABLES.includes(x.titulo)).reverse()){
+      const titulo = `${f.titulo} › ${s.titulo}`;
+      out = out.filter(o => o.sec.titulo !== titulo);
+      out.unshift({doc: null, sec: {titulo, texto: fichaParaAgente(s.texto), ficha: f.id}, score: 99});
+    }
+  }
   // Si la mayoría de las coincidencias están en un mismo video, los agentes leen todos sus temas
   // (la respuesta suele estar repartida en temas contiguos que no repiten las palabras de la pregunta).
-  const [topDoc, set] = [...byDoc.entries()].sort((a,b) => b[1].size - a[1].size)[0] || [];
+  const [topDoc, set] = [...byDoc.entries()].filter(([d]) => !hits.some(h => h.c.ficha && h.c.doc === d)).sort((a,b) => b[1].size - a[1].size)[0] || [];
   if (set && set.size >= 3){
     const d = WIKI.documentos.find(x => x.id === topDoc);
     const extra = d.secciones.filter(s => s.num != null && !out.some(o => o.doc === topDoc && o.sec === s)).map(s => ({doc: topDoc, sec: s, score: 0}));
@@ -313,6 +356,7 @@ function sectionsFor(hits){
 /* ---------- agentes ---------- */
 function contextText(secs){
   return secs.map(({doc, sec}) => {
+    if (sec.ficha) return `### Ficha consolidada: ${sec.titulo}\n${sec.texto}`;
     const d = WIKI.documentos.find(x => x.id === doc);
     const rango = sec.desde ? ` (${sec.desde}–${sec.hasta})` : "";
     return `### [doc:${doc}] ${d.titulo} › ${sec.titulo}${rango}\n${sec.texto}`;
@@ -329,6 +373,7 @@ Trabajás sobre una wiki en formato OKF hecha a partir de transcripciones de reu
 REGLAS ESTRICTAS
 - Usá SOLO el texto de las secciones de abajo. Nada de conocimiento general.
 - Cada afirmación lleva el id del documento (lo que sigue a "doc:") y el timestamp [m:ss] o [h:mm:ss] que aparece en el texto junto a esa idea. No inventes timestamps.
+- Priorizá las "Fichas consolidadas": ya reúnen lo dicho en todos los videos. Allí las citas aparecen como [doc:<id> m:ss]; usá ese id y ese minuto. Si la ficha señala una contradicción, respondé con la versión vigente y mencioná que hubo un cambio.
 - Los términos marcados [?] van como "sin confirmar".
 - Si las secciones no responden la pregunta desde tu enfoque, devolvé sin_evidencia: true y afirmaciones vacía.
 - Máximo 8 afirmaciones, cada una de 1 o 2 oraciones, en español rioplatense neutro.
@@ -518,6 +563,36 @@ function sectionHtml(doc, txt){
   }
   return html;
 }
+function fichaHtml(txt){
+  const marcas = [];
+  const pre = txt.replace(CITA_RE_G, (m, lab, ts, doc) => { marcas.push([doc, ts, lab.trim()]); return `\u0001${marcas.length - 1}\u0001`; })
+                 .replace(/\[([^\]]+)\]\(([\w-]+)\.md\)/g, (m, t, id) => `\u0002${id}\u0002${t}\u0002`);
+  let html = sectionHtml(null, pre);
+  html = html.replace(/\u0001(\d+)\u0001/g, (m, i) => { const [doc, ts, lab] = marcas[+i]; return `<span class="cita"><span class="cita-src">${esc(lab)}</span>${tcChip(doc, ts)}</span>`; })
+             .replace(/\u0002([\w-]+)\u0002([^\u0002]*)\u0002/g, (m, id, t) => `<a href="#" data-ficha="${esc(id)}">${t}</a>`);
+  return html;
+}
+const TIPOS_FICHA = [["Término", "Términos"], ["Regla de negocio", "Reglas de negocio"], ["Caso especial", "Casos especiales"]];
+function renderFichas(){
+  const fichas = WIKI.fichas || [];
+  let html = `<p class="note" style="margin-top:0">Cada ficha reúne lo que se dijo sobre un concepto en todos los videos, con el minuto de cada fuente. Están en borrador hasta que un referente las valide.</p>`;
+  for (const [tipo, plural] of TIPOS_FICHA){
+    const grupo = fichas.filter(f => f.tipo === tipo); if (!grupo.length) continue;
+    html += `<h2 class="sec">${plural}</h2>` + grupo.map(f => `<details class="ficha video" id="ficha-${esc(f.id)}"><summary>
+        <span class="tt"><b>${esc(f.titulo)}</b><span class="desc">${esc(f.descripcion || "")}</span></span>
+        <span class="badges"><span class="dom ${esc(f.dominio)}">${esc(f.dominio)}</span><span class="estado">${esc(f.estado)}</span>${f.contradicciones ? `<span class="warn">⚠ ${f.contradicciones} contradicción${f.contradicciones > 1 ? "es" : ""}</span>` : ""}</span>
+      </summary><div class="tema-body">${f.secciones.filter(s => s.titulo !== "Fuentes").map(s => `<h3 class="fsec">${esc(s.titulo)}</h3>${fichaHtml(s.texto)}`).join("")}
+      <p class="note">Última fuente: ${esc(f.ultima_fuente || "—")} · Valida: ${esc(f.valida || "—")}</p></div></details>`).join("");
+  }
+  $("#p-fichas").innerHTML = html;
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-ficha]"); if (!a) return;
+  e.preventDefault();
+  const d = document.getElementById("ficha-" + a.dataset.ficha); if (!d) return;
+  document.querySelector('nav.tabs button[data-tab="fichas"]').click();
+  d.open = true; d.scrollIntoView({behavior: "smooth", block: "start"});
+});
 function renderExplore(){
   const docs = WIKI.documentos.slice().sort((a,b) => (b.fecha||"0").localeCompare(a.fecha||"0"));
   let html = docs.map(d => {
@@ -571,7 +646,7 @@ $("#cfgsave").addEventListener("click", async () => {
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
-  for (const id of ["consultar","explorar","glosario","huecos"]) $("#p-" + id).hidden = id !== b.dataset.tab;
+  for (const id of ["consultar","fichas","explorar","glosario","huecos"]) $("#p-" + id).hidden = id !== b.dataset.tab;
   try { localStorage.setItem("wiki-tab", b.dataset.tab); } catch(_){}
 });
 document.querySelector(".seg").addEventListener("click", e => {
@@ -592,8 +667,8 @@ async function boot(){
   catch(e){ $("#out").innerHTML = `<p class="note err">No se pudo cargar la wiki. Recargá la página.</p>`; return; }
   buildIndex(); TERMS = termRows();
   const temas = WIKI.documentos.reduce((n,d) => n + d.secciones.filter(s => s.num != null).length, 0);
-  $("#stats").innerHTML = `<span><b>${WIKI.documentos.length}</b> videos</span><span><b>${temas}</b> temas</span><span><b>${TERMS.length}</b> términos</span>`;
-  renderExplore(); renderGlossary("");
+  $("#stats").innerHTML = `<span><b>${(WIKI.fichas || []).length}</b> fichas</span><span><b>${WIKI.documentos.length}</b> videos</span><span><b>${temas}</b> temas</span><span><b>${TERMS.length}</b> términos</span>`;
+  renderFichas(); renderExplore(); renderGlossary("");
   try { const t = localStorage.getItem("wiki-tab"); if (t && t !== "consultar") document.querySelector(`nav.tabs button[data-tab="${t}"]`)?.click(); } catch(_){}
 
   if (!window.claude) return;
@@ -605,7 +680,7 @@ async function boot(){
     d.collection("huecos").orderBy("ultima", "desc").limit(100).onSnapshot(snap => { GAPDOCS = snap.docs; renderGaps(GAPDOCS); }, () => { $("#gaplist").innerHTML = `<div class="empty">No se pudo leer el registro.</div>`; });
     d.doc("config/videos").onSnapshot(s => {
       VIDEO_LINKS = (s.exists && s.data().links) || {};
-      renderExplore(); renderGlossary($("#gsearch").value);
+      renderFichas(); renderExplore(); renderGlossary($("#gsearch").value);
       if (EDITOR) renderCfg();
     }, () => {});
   });

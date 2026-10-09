@@ -13,6 +13,7 @@ class Afirmacion:
     texto: str
     video_id: str
     minuto: str  # tal como aparece en el documento: m:ss o h:mm:ss
+    ficha_id: str | None = None  # ficha consolidada de donde salió, si corresponde
 
 
 @dataclass

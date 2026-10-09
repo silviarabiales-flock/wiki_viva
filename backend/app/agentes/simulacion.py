@@ -25,6 +25,8 @@ def limpiar(texto: str, maximo: int = 320) -> str:
         else:  # tabla completa: se descarta el encabezado y se resume cada fila
             filas = filas[1:]
             t = "; ".join(" → ".join(x.strip() for x in f.split("|")[1:-1]) for f in filas) + "."
+    t = re.sub(r"\s*\[[^\]]*·\s*\d{1,2}:\d{2}(?::\d{2})?\]\([^)]*\)", "", t)  # citas de fichas
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\.md[^)]*\)", r"\1", t)  # links a otras fichas
     t = re.sub(r"^>\s*", "", t)
     t = re.sub(r"^-\s*", "", t)
     t = re.sub(r"\[\d{1,2}:\d{2}(?::\d{2})?(?:[–-]\d{1,2}:\d{2}(?::\d{2})?)?\]\s*", "", t)
@@ -58,7 +60,9 @@ class AgentesSimulados:
             # el minuto se toma del propio fragmento (como lo haría un agente que lee el texto)
             m = re.search(r"\[(\d{1,2}:\d{2}(?::\d{2})?)", h["texto"]) or re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)\s*\|?\s*$", h["texto"])
             minuto = m.group(1) if m else h["timestamp"]
-            out.append(Afirmacion(texto, h["video_id"], minuto))
+            if h.get("ficha_id"):
+                minuto = h["timestamp"]  # en fichas, el minuto es el de la primera cita del fragmento
+            out.append(Afirmacion(texto, h["video_id"], minuto, h.get("ficha_id")))
             if len(out) >= maximo:
                 break
         return out
@@ -82,7 +86,11 @@ class AgentesSimulados:
 
     async def sintesis(self, pregunta: str, citas: list[dict], vista: str) -> Sintesis:
         await self._pausa()
-        orden = sorted(citas, key=lambda c: (c["video_id"], c["segundos"]))[:5]
+        orden, vistos = [], set()
+        for c in citas:  # sin repetir la misma afirmación de los dos agentes
+            if c["texto"] not in vistos:
+                vistos.add(c["texto"]); orden.append(c)
+        orden = orden[:5]
         pasos = "\n".join(f"{i}. {c['texto']} [{c['id']}]" for i, c in enumerate(orden, 1))
         f = next((c for c in citas if c["agente"] == "funcional"), None)
         t = next((c for c in citas if c["agente"] == "tecnico"), None)

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Wiki viva – API de consulta
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contrato entre el frontend (portal) y el backend de la Wiki viva de consulta de
     terminología técnica y funcional.
@@ -123,6 +123,41 @@ paths:
               schema: { $ref: "#/components/schemas/Video" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /api/wiki/fichas:
+    get:
+      tags: [wiki]
+      summary: Fichas consolidadas (Término, Regla de negocio, Caso especial)
+      description: |
+        Rol mínimo `lector`. Cada ficha reúne lo que se dijo sobre un concepto en todos los videos,
+        con citas al video y minuto de origen. Ante contradicciones, la ficha indica cuál fuente está vigente.
+      parameters:
+        - { name: tipo, in: query, required: false, schema: { type: string, enum: ["Término", "Regla de negocio", "Caso especial"] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fichas]
+                properties:
+                  fichas: { type: array, items: { $ref: "#/components/schemas/FichaResumen" } }
+
+  /api/wiki/fichas/{ficha_id}:
+    get:
+      tags: [wiki]
+      summary: Contenido de una ficha
+      description: Rol mínimo `lector`. Las citas vienen en el texto como `[Charla 4 · 16:39](../archivo-del-video.md)`.
+      parameters:
+        - { name: ficha_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ficha" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /api/glosario:
     get:
       tags: [wiki]
@@ -238,11 +273,12 @@ components:
 
     Salud:
       type: object
-      required: [estado, modo_agentes, videos, version]
+      required: [estado, modo_agentes, videos, fichas, version]
       properties:
         estado: { type: string, enum: [ok] }
         modo_agentes: { type: string, enum: [simulacion, claude] }
         videos: { type: integer }
+        fichas: { type: integer }
         version: { type: string }
 
     PedidoConsulta:
@@ -265,6 +301,7 @@ components:
         segundos: { type: integer, example: 463 }
         texto: { type: string, description: Afirmación respaldada por ese minuto }
         url_video: { type: [string, "null"], description: Link a la grabación en ese segundo, si hay link configurado }
+        ficha_id: { type: [string, "null"], description: Ficha consolidada de donde salió la afirmación, si corresponde }
 
     ResultadoConsulta:
       type: object
@@ -318,6 +355,7 @@ components:
         titulo: { type: string }
         videos: { type: array, items: { $ref: "#/components/schemas/VideoResumen" } }
         sin_procesar: { type: array, items: { type: string } }
+        total_fichas: { type: integer }
 
     Seccion:
       type: object
@@ -338,6 +376,36 @@ components:
           required: [secciones]
           properties:
             secciones: { type: array, items: { $ref: "#/components/schemas/Seccion" } }
+
+    FichaResumen:
+      type: object
+      required: [id, tipo, titulo, dominio, estado, contradicciones]
+      properties:
+        id: { type: string, example: termino-grupo-de-negocio }
+        tipo: { type: string, enum: ["Término", "Regla de negocio", "Caso especial"] }
+        titulo: { type: string }
+        descripcion: { type: [string, "null"] }
+        dominio: { type: string }
+        estado: { type: string, enum: [borrador, validada] }
+        valida: { type: [string, "null"], description: Quién tiene que validarla }
+        contradicciones: { type: integer, description: Cantidad de contradicciones entre fuentes señaladas en la ficha }
+        ultima_fuente: { type: [string, "null"], format: date }
+        aliases: { type: array, items: { type: string } }
+
+    Ficha:
+      allOf:
+        - $ref: "#/components/schemas/FichaResumen"
+        - type: object
+          required: [secciones]
+          properties:
+            secciones:
+              type: array
+              items:
+                type: object
+                required: [titulo, texto]
+                properties:
+                  titulo: { type: string, description: "Definición | Regla | Situación, Detalle, Contradicciones, Relacionados, Fuentes" }
+                  texto: { type: string, description: Markdown con citas a video y minuto }
 
     Termino:
       type: object

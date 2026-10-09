@@ -28,4 +28,4 @@ class Config:
     simulacion_demora_ms: int = field(default_factory=lambda: int(os.getenv("SIMULACION_DEMORA_MS", "0")))
 
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"

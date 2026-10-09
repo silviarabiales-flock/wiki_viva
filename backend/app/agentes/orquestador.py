@@ -31,7 +31,8 @@ class Orquestador:
             sec = doc.seccion_de_segundo(seg)
             out.append({"id": f"{prefijo}{len(out) + 1}", "agente": agente, "video_id": doc.id, "titulo": doc.titulo,
                         "seccion": sec.titulo if sec else "", "minuto": hhmmss(a.minuto), "segundos": seg,
-                        "texto": a.texto, "url_video": url_en_segundo(links.get(doc.id), seg)})
+                        "texto": a.texto, "url_video": url_en_segundo(links.get(doc.id), seg),
+                        "ficha_id": a.ficha_id if a.ficha_id in self.wiki.fichas else None})
         return out
 
     def _sin_info(self, cid: str, pregunta: str, vista: str) -> dict:
