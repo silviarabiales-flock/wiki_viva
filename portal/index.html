@@ -1,0 +1,615 @@
+<title>Wiki viva de consulta de terminología técnica y funcional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: una columna de trabajo (consulta y respuesta) con pestañas; los minutos del video se muestran como etiquetas de cinta (timecode). */
+:root{
+  --bg:#F4F5F2; --surface:#FFFFFF; --sunk:#ECEEE9; --ink:#1A2126; --muted:#5A6570; --line:#D9DDD6;
+  --accent:#0B6B63; --accent-ink:#FFFFFF; --accent-soft:#DDEEEB;
+  --tc-bg:#FAE7B0; --tc-fg:#5E3E00; --tc-line:#E7C970;
+  --ok:#2F7A3B; --warn:#9A5B00; --bad:#A3322B;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111618; --surface:#182024; --sunk:#141B1E; --ink:#E5EAE7; --muted:#9BA7AD; --line:#29343A;
+  --accent:#4FC1B4; --accent-ink:#06201D; --accent-soft:#16312F;
+  --tc-bg:#3A2E10; --tc-fg:#F3D27E; --tc-line:#5C4A1C;
+  --ok:#6FCB7E; --warn:#E8B04F; --bad:#F08A80; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#111618; --surface:#182024; --sunk:#141B1E; --ink:#E5EAE7; --muted:#9BA7AD; --line:#29343A;
+  --accent:#4FC1B4; --accent-ink:#06201D; --accent-soft:#16312F;
+  --tc-bg:#3A2E10; --tc-fg:#F3D27E; --tc-line:#5C4A1C;
+  --ok:#6FCB7E; --warn:#E8B04F; --bad:#F08A80; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:860px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:28px 14px;border-bottom:1px solid var(--line)}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,3.6vw,2.1rem);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.brand p{margin:.35rem 0 0;color:var(--muted);font-size:.92rem}
+.brand p.proto{display:inline-block;margin-top:.5rem;font-size:.78rem;color:var(--tc-fg);background:var(--tc-bg);border:1px solid var(--tc-line);border-radius:999px;padding:.1rem .6rem}
+.stats{display:flex;gap:16px;font-size:.82rem;color:var(--muted)}
+.stats b{font-family:var(--f-mono);font-weight:500;color:var(--ink);font-size:.95rem}
+nav.tabs{display:flex;gap:4px;margin-block:14px 18px;overflow-x:auto}
+nav.tabs button{font:500 .9rem var(--f-body);color:var(--muted);background:none;border:1px solid transparent;border-radius:999px;padding:.4rem .9rem;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);background:var(--surface);border-color:var(--line)}
+nav.tabs .count{font-family:var(--f-mono);font-size:.75rem;margin-left:.35rem;color:var(--muted)}
+button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Consulta */
+.ask{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:10px}
+.ask textarea{width:100%;min-height:68px;resize:vertical;border:0;background:transparent;color:var(--ink);font:400 1.05rem/1.45 var(--f-body);padding:4px 2px}
+.ask textarea::placeholder{color:var(--muted)}
+.ask-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.seg{display:inline-flex;background:var(--sunk);border-radius:999px;padding:3px;gap:2px}
+.seg button{font:500 .82rem var(--f-body);border:0;background:none;color:var(--muted);padding:.3rem .75rem;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.btn{font:600 .9rem var(--f-body);border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:.45rem 1rem;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.55;cursor:default}
+.sugs{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sugs button{font:400 .85rem var(--f-body);background:none;border:1px dashed var(--line);color:var(--ink);border-radius:999px;padding:.3rem .8rem;cursor:pointer}
+.sugs button:hover{border-color:var(--accent);color:var(--accent)}
+.label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.steps{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:6px;font-size:.88rem}
+.steps li{display:flex;gap:8px;align-items:center;color:var(--muted)}
+.steps li::before{content:"";width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line);flex:none}
+.steps li.run{color:var(--ink)} .steps li.run::before{border-color:var(--accent);background:var(--accent-soft);animation:pulse 1.2s ease-in-out infinite}
+.steps li.done::before{background:var(--accent);border-color:var(--accent)}
+.steps li.skip{opacity:.55}
+@keyframes pulse{50%{transform:scale(1.35)}}
+@media (prefers-reduced-motion: reduce){.steps li.run::before{animation:none}}
+
+.answer{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 14px}
+.answer .q{font-family:var(--f-display);font-weight:500;font-size:1.2rem;margin:0 0 12px;text-wrap:balance}
+.answer .body{min-width:0}
+.answer .body p{margin:.5rem 0}
+.answer .body ol,.answer .body ul{margin:.4rem 0;padding-left:1.3rem}
+.answer .body li{margin:.3rem 0}
+.answer code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);padding:.05rem .3rem;border-radius:4px}
+.views{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:14px}
+.view{border-top:2px solid var(--line);padding-top:8px;min-width:0}
+.view.f{border-color:var(--accent)} .view.t{border-color:var(--tc-line)}
+.view h3{font:600 .8rem var(--f-body);text-transform:uppercase;letter-spacing:.07em;margin:0 0 4px;color:var(--muted)}
+.view p{margin:.25rem 0;font-size:.93rem}
+.nodata{font-family:var(--f-display);font-size:1.25rem;font-weight:500;margin:0}
+.nodata-sub{color:var(--muted);font-size:.9rem;margin:.4rem 0 0}
+
+/* Timecode: etiqueta de cinta */
+.tc{display:inline-flex;align-items:center;gap:.3rem;font:500 .8rem var(--f-mono);font-variant-numeric:tabular-nums;color:var(--tc-fg);background:var(--tc-bg);border:1px solid var(--tc-line);border-radius:4px;padding:.02rem .4rem;cursor:pointer;white-space:nowrap;vertical-align:baseline;text-decoration:none}
+.tc::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--bad);opacity:.85}
+.tc:hover{filter:brightness(.97);border-color:var(--tc-fg)}
+.sources{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+.sources h3{font:600 .8rem var(--f-body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 6px}
+.src{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--line);font-size:.88rem}
+.src:last-child{border-bottom:0}
+.src .meta{color:var(--muted);min-width:0}
+.src .meta b{color:var(--ink);font-weight:500}
+.foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:12px;font-size:.82rem;color:var(--muted)}
+.fb button{background:none;border:1px solid var(--line);border-radius:999px;padding:.2rem .7rem;cursor:pointer;color:var(--ink);font:500 .82rem var(--f-body)}
+.fb button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.note{font-size:.84rem;color:var(--muted);margin-top:8px}
+.err{color:var(--bad)}
+
+.history{margin-top:22px}
+.history ul{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:4px}
+.history button{background:none;border:0;color:var(--accent);font:400 .9rem var(--f-body);cursor:pointer;padding:0;text-align:left}
+
+/* Explorar */
+.video{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.video h2{font-family:var(--f-display);font-weight:500;font-size:1.1rem;margin:0;text-wrap:balance}
+.video .vm{font-size:.82rem;color:var(--muted);margin:.25rem 0 .5rem;display:flex;flex-wrap:wrap;gap:10px}
+.video .vm code{font-family:var(--f-mono);font-size:.78rem}
+.video p.desc{margin:.2rem 0 .6rem;font-size:.92rem}
+details.tema{border-top:1px solid var(--line)}
+details.tema summary{display:flex;gap:10px;align-items:baseline;padding:8px 0;cursor:pointer;list-style:none}
+details.tema summary::-webkit-details-marker{display:none}
+details.tema summary .tn{font:500 .8rem var(--f-mono);color:var(--muted);min-width:1.6rem}
+details.tema summary .tt{flex:1;min-width:0}
+.dom{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;padding:.05rem .45rem;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dom.tecnico{color:var(--tc-fg);border-color:var(--tc-line)} .dom.ambos{color:var(--accent);border-color:var(--accent)} .dom.funcional{color:var(--ok);border-color:var(--ok)}
+.tema-body{padding:0 0 12px 2.2rem;font-size:.92rem;min-width:0}
+.tema-body p{margin:.4rem 0}
+.tema-body blockquote{margin:.5rem 0;padding:.4rem .7rem;background:var(--accent-soft);border-radius:6px}
+.tema-body table{border-collapse:collapse;font-size:.85rem}
+.tema-body td,.tema-body th{border:1px solid var(--line);padding:.25rem .45rem;text-align:left;vertical-align:top}
+.tbl{overflow-x:auto}
+.pend{background:var(--sunk);border-radius:var(--r);padding:12px 16px;font-size:.88rem}
+.pend ul{columns:2 240px;margin:.4rem 0 0;padding-left:1.1rem;color:var(--muted)}
+
+/* Glosario */
+.search{width:100%;font:400 .95rem var(--f-body);padding:.55rem .8rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);margin-bottom:12px}
+.gl{display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.gl .row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr;gap:4px 14px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:.9rem}
+.gl .row:last-child{border-bottom:0}
+.gl .term{font-weight:600;min-width:0}
+.gl .aud{display:block;font:400 .78rem var(--f-mono);color:var(--muted);margin-top:2px;word-break:break-word}
+.gl .def{min-width:0}
+@media (max-width:520px){.gl .row{grid-template-columns:1fr}}
+h2.sec{font-family:var(--f-display);font-weight:500;font-size:1.05rem;margin:20px 0 8px}
+
+/* Huecos y configuración */
+.gap{display:flex;gap:10px;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.gap .when{font:400 .78rem var(--f-mono);color:var(--muted);white-space:nowrap}
+.empty{color:var(--muted);font-size:.92rem;padding:18px;border:1px dashed var(--line);border-radius:var(--r);text-align:center}
+.cfg{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-top:16px}
+.cfg label{display:block;font-size:.85rem;margin:10px 0 4px;font-weight:500}
+.cfg input{width:100%;font:400 .85rem var(--f-mono);padding:.45rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5rem 1rem;border-radius:999px;font-size:.85rem;max-width:calc(100% - 32px)}
+.vidpop{margin-top:10px;background:var(--sunk);border-radius:8px;padding:10px 12px;font-size:.85rem}
+.vidpop code{font-family:var(--f-mono);font-size:.8rem;word-break:break-all}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Wiki viva de consulta de terminología técnica y funcional</h1>
+      <p>Preguntá por términos, reglas y casos especiales. Responde con lo que se dijo en las grabaciones y te dice en qué minuto.</p>
+      <p class="proto">Prototipo con datos ficticios: personas, empresa, tablas, tickets y fechas son inventados.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="consultar" id="t-consultar">Consultar</button>
+    <button role="tab" aria-selected="false" data-tab="explorar" id="t-explorar">Explorar videos</button>
+    <button role="tab" aria-selected="false" data-tab="glosario" id="t-glosario">Glosario</button>
+    <button role="tab" aria-selected="false" data-tab="huecos" id="t-huecos">Sin respuesta<span class="count" id="gapcount"></span></button>
+  </nav>
+
+  <section id="p-consultar" role="tabpanel">
+    <form class="ask" id="askform">
+      <label for="q" class="label">Tu consulta</label>
+      <textarea id="q" placeholder="Ej.: ¿Cómo se hace la validación compuesta?" maxlength="500"></textarea>
+      <div class="ask-row">
+        <div class="seg" role="group" aria-label="Qué vista querés">
+          <button type="button" data-mode="ambas" aria-pressed="true">Funcional + técnica</button>
+          <button type="button" data-mode="funcional" aria-pressed="false">Funcional</button>
+          <button type="button" data-mode="tecnica" aria-pressed="false">Técnica</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn" id="stop" hidden>Detener</button>
+          <button type="submit" class="btn primary" id="go">Preguntar</button>
+        </div>
+      </div>
+    </form>
+    <div class="sugs" id="sugs" aria-label="Preguntas sugeridas"></div>
+    <ol class="steps" id="steps" hidden></ol>
+    <div id="out"></div>
+    <div class="history" id="history" hidden><span class="label">Consultas de esta sesión</span><ul id="histlist"></ul></div>
+  </section>
+
+  <section id="p-explorar" role="tabpanel" hidden></section>
+  <section id="p-glosario" role="tabpanel" hidden>
+    <input class="search" id="gsearch" type="search" placeholder="Buscar un término o cómo suena en el audio (ej.: Jason, Red Code)">
+    <div id="glist"></div>
+  </section>
+  <section id="p-huecos" role="tabpanel" hidden>
+    <p class="note" style="margin-top:0">Preguntas que la wiki no pudo responder. Sirven para decidir qué grabación procesar o qué tema documentar.</p>
+    <div id="gaplist"><div class="empty">Cargando…</div></div>
+    <div class="cfg" id="cfg" hidden>
+      <span class="label">Configurar grabaciones</span>
+      <p class="note">Pegá el link de cada grabación (SharePoint, Stream u otro). Al tocar un minuto se abre la grabación en ese punto. Solo lo ven y cambian los editores.</p>
+      <form id="cfgform"></form>
+      <button class="btn primary" id="cfgsave" type="button" style="margin-top:12px">Guardar links</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const SIN_INFO = "No tengo información sobre tu consulta";
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let WIKI = null, INDEX = null, sample = null, db = null, user = null;
+let VIDEO_LINKS = {}, mode = "ambas", ctl = null, busy = false, EDITOR = false, GAPDOCS = [];
+const history = [];
+
+/* ---------- utilidades de tiempo ---------- */
+const toSec = ts => ts.split(":").reduce((a,p) => a*60 + (+p), 0);
+const hhmmss = ts => { const s = toSec(ts); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return [h,m,x].map(n=>String(n).padStart(2,"0")).join(":"); };
+function videoUrlAt(url, secs){
+  try{
+    const u = new URL(url);
+    if (/sharepoint\.com|microsoftstream\.com/i.test(u.hostname)) {
+      const nav = btoa(JSON.stringify({playbackOptions:{startTimeInSeconds:secs}}));
+      u.searchParams.set("nav", nav); return u.toString();
+    }
+    if (/youtu\.?be/i.test(u.hostname)) { u.searchParams.set("t", secs + "s"); return u.toString(); }
+    u.hash = "t=" + secs; return u.toString();
+  }catch(e){ return null; }
+}
+function tcChip(docId, ts){
+  const doc = WIKI.documentos.find(d => d.id === docId);
+  const url = VIDEO_LINKS[docId] ? videoUrlAt(VIDEO_LINKS[docId], toSec(ts)) : null;
+  const t = esc(`${doc ? doc.titulo : ""} — ${hhmmss(ts)}`);
+  if (url) return `<a class="tc" href="${esc(url)}" target="_blank" rel="noopener" title="Abrir la grabación en ${t}">${hhmmss(ts)}</a>`;
+  return `<button type="button" class="tc" data-doc="${esc(docId)}" data-ts="${esc(ts)}" title="${t}">${hhmmss(ts)}</button>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button.tc"); if (!b) return;
+  if (b.closest("summary")) e.preventDefault();
+  const doc = WIKI.documentos.find(d => d.id === b.dataset.doc);
+  const box = b.closest(".answer, .tema-body, .gl, .video") || document.body;
+  let pop = box.querySelector(".vidpop"); if (!pop){ pop = document.createElement("div"); pop.className = "vidpop"; box.appendChild(pop); }
+  const time = hhmmss(b.dataset.ts);
+  pop.innerHTML = `Grabación: <code>${esc(doc.video)}</code> · minuto <b>${time}</b>. <button class="btn" type="button" data-copy="${esc(doc.video + " " + time)}" style="padding:.15rem .6rem;font-size:.78rem">Copiar</button><br><span class="note">Todavía no hay link cargado para esta grabación. Se puede agregar en "Sin respuesta" › Configurar grabaciones.</span>`;
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); toast("Copiado"); } catch(_) { toast("Seleccioná el texto para copiarlo"); }
+});
+function toast(msg){ const t = document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 1800); }
+
+/* ---------- motor de búsqueda (mismo criterio que consulta_okf.py) ---------- */
+const STOP = new Set(("a al algo algun alguna algunas alguno algunos ante antes aqui asi aun bien cada como con contra cual cuales cuando de del desde donde dos el ella ellas ellos en entre era es esa esas ese eso esos esta estan estas este esto estos fue ha hay hace hacen hacer hacemos hago la las le les lo los mas me mi muy no nos o otra otro para pero poco por porque que quien se ser si sin sobre son su sus tambien te tiene tienen todo todos tu un una unas uno unos usa usar ya y funciona funcionan significa sirve explica explicar decir dice puedo puede pueden debo debe deben tengo tenemos quiero necesito cosa caso manera forma").split(" "));
+const SUF = ["aciones","acion","iciones","icion","ciones","cion","adores","ador","mente","ados","adas","ado","ada","ar","er","ir","es","s"];
+const noAcc = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+function stem(t){ for (const s of SUF){ if (t.length - s.length >= 4 && t.endsWith(s)){ t = t.slice(0, -s.length); break; } } return t.slice(0,7); }
+function toks(text){ return (noAcc(String(text).toLowerCase()).match(/[a-z0-9_]+/g) || []).filter(w => w.length > 1 && !STOP.has(w)).map(stem); }
+const TS_RE = /(\d{1,2}:\d{2}(?::\d{2})?)/;
+
+function buildIndex(){
+  const chunks = [];
+  for (const d of WIKI.documentos){
+    for (const s of d.secciones){
+      if (s.h2 === "Resumen") continue;
+      const list = s.num == null; // reglas / términos: un fragmento por ítem
+      const parts = list ? s.texto.split("\n").filter(l => /^(- |\| )/.test(l) && !/^\|\s*(Término|---)/.test(l)) : s.texto.split(/\n\s*\n/);
+      for (const p of parts){
+        const t = p.trim(); if (t.length < 25) continue;
+        let m = t.match(/\[(\d{1,2}:\d{2}(?::\d{2})?)/);
+        if (!m && t.startsWith("|")) { const cells = t.split("|"); m = (cells[cells.length-2]||"").match(TS_RE); }
+        const ts = m ? m[1] : s.desde; if (!ts) continue;
+        chunks.push({doc:d.id, sec:s, ts, text:t, tok: toks(t).concat(toks(s.titulo), toks(s.titulo)),
+          regla: /^>?\s*\*\*(Regla|Caso)/.test(t)});
+      }
+    }
+  }
+  const df = new Map(); let total = 0;
+  for (const c of chunks){ total += c.tok.length; for (const t of new Set(c.tok)) df.set(t, (df.get(t)||0)+1); }
+  // timestamps válidos por documento, para verificar citas
+  const valid = {};
+  for (const d of WIKI.documentos){ valid[d.id] = new Set((d.secciones.map(s=>s.texto).join("\n").match(/\d{1,2}:\d{2}(?::\d{2})?/g)) || []); }
+  INDEX = {chunks, df, avg: total / chunks.length, N: chunks.length, valid};
+}
+function search(q){
+  const qt = [...new Set(toks(q))]; if (!qt.length) return [];
+  const {chunks, df, avg, N} = INDEX, k1 = 1.4, b = .75;
+  const idf = t => Math.log(1 + (N - (df.get(t)||0) + .5) / ((df.get(t)||0) + .5));
+  const scored = chunks.map(c => {
+    const tf = new Map(); for (const t of c.tok) tf.set(t, (tf.get(t)||0)+1);
+    let s = 0, hit = 0;
+    for (const t of qt){ const f = tf.get(t)||0; if (f){ hit++; s += idf(t) * f * (k1+1) / (f + k1*(1-b+b*c.tok.length/avg)); } }
+    if (c.regla) s *= 1.15;
+    return {c, s, cov: hit / qt.length};
+  }).sort((a,b) => b.s - a.s);
+  const best = scored.length ? scored[0].s : 0;
+  return scored.filter(x => x.s >= 3 && x.cov >= .6 && x.s >= .35*best).slice(0, 12);
+}
+function sectionsFor(hits){
+  const map = new Map(), byDoc = new Map();
+  for (const h of hits){
+    const key = h.c.doc + "|" + h.c.sec.titulo;
+    if (!map.has(key)) map.set(key, {doc:h.c.doc, sec:h.c.sec, score:h.s});
+    byDoc.set(h.c.doc, (byDoc.get(h.c.doc) || new Set()).add(h.c.sec.titulo));
+  }
+  let out = [...map.values()].sort((a,b)=>b.score-a.score).slice(0, 6);
+  // Si la mayoría de las coincidencias están en un mismo video, los agentes leen todos sus temas
+  // (la respuesta suele estar repartida en temas contiguos que no repiten las palabras de la pregunta).
+  const [topDoc, set] = [...byDoc.entries()].sort((a,b) => b[1].size - a[1].size)[0] || [];
+  if (set && set.size >= 3){
+    const d = WIKI.documentos.find(x => x.id === topDoc);
+    const extra = d.secciones.filter(s => s.num != null && !out.some(o => o.doc === topDoc && o.sec === s)).map(s => ({doc: topDoc, sec: s, score: 0}));
+    out = out.concat(extra);
+  }
+  return out;
+}
+/* ---------- agentes ---------- */
+function contextText(secs){
+  return secs.map(({doc, sec}) => {
+    const d = WIKI.documentos.find(x => x.id === doc);
+    const rango = sec.desde ? ` (${sec.desde}–${sec.hasta})` : "";
+    return `### [doc:${doc}] ${d.titulo} › ${sec.titulo}${rango}\n${sec.texto}`;
+  }).join("\n\n").slice(0, 60000);
+}
+function glossaryText(){ return WIKI.glosario.map(g => `- ${g.audio} → ${g.es}`).join("\n"); }
+function agentPrompt(kind, q, ctx){
+  const foco = kind === "funcional"
+    ? "Sos el agente FUNCIONAL. Respondé qué es, para qué sirve, qué ve o hace el usuario o el negocio, cuándo se usa, reglas de negocio y casos especiales. Evitá detalles de implementación salvo que hagan falta para entender el concepto."
+    : "Sos el agente TÉCNICO. Respondé los pasos de implementación en orden, tablas, campos, tipos, procedimientos, plantillas, parametrización, validaciones y advertencias de rendimiento.";
+  return `${foco}
+Trabajás sobre una wiki en formato OKF hecha a partir de transcripciones de reuniones del proyecto "Modernización de módulos" (migración de Oracle Forms a un sistema parametrizable).
+
+REGLAS ESTRICTAS
+- Usá SOLO el texto de las secciones de abajo. Nada de conocimiento general.
+- Cada afirmación lleva el id del documento (lo que sigue a "doc:") y el timestamp [m:ss] o [h:mm:ss] que aparece en el texto junto a esa idea. No inventes timestamps.
+- Los términos marcados [?] van como "sin confirmar".
+- Si las secciones no responden la pregunta desde tu enfoque, devolvé sin_evidencia: true y afirmaciones vacía.
+- Máximo 8 afirmaciones, cada una de 1 o 2 oraciones, en español rioplatense neutro.
+
+Respondé SOLO con JSON: {"sin_evidencia": false, "afirmaciones": [{"texto": "...", "doc": "<id>", "ts": "m:ss"}]}
+
+GLOSARIO (cómo suena la jerga en el audio → qué es)
+${glossaryText()}
+
+PREGUNTA: ${q}
+
+SECCIONES
+${ctx}`;
+}
+function synthPrompt(q, claims, modeSel){
+  const lines = claims.map(c => `[${c.id}] (${c.kind}) ${c.texto}`).join("\n");
+  return `Sos el orquestador de un asistente de consultas. Armá la respuesta final a la pregunta usando SOLO estas afirmaciones verificadas (F = agente funcional, T = agente técnico):
+
+${lines}
+
+PREGUNTA: ${q}
+VISTA PEDIDA: ${modeSel}
+
+Instrucciones:
+- "respuesta": respuesta directa en 1 a 3 párrafos cortos, o pasos numerados ("1. ...") si la pregunta es "cómo se hace". Después de cada idea poné entre corchetes los ids que la respaldan, por ejemplo [T2] o [F1][T3]. No agregues nada que no esté en las afirmaciones.
+- "vista_funcional": 1 o 2 oraciones con ids, o "" si no hay afirmaciones F.
+- "vista_tecnica": 1 o 2 oraciones con ids, o "" si no hay afirmaciones T.
+- Podés usar **negrita** para nombres de procedimientos u opciones.
+Respondé SOLO con JSON: {"respuesta": "...", "vista_funcional": "...", "vista_tecnica": "..."}`;
+}
+function rewritePrompt(q){
+  return `Una persona preguntó a una wiki técnica: "${q}". La búsqueda no encontró nada. Reescribí la pregunta usando los términos correctos del glosario (corrigiendo jerga o errores de transcripción) y sinónimos probables en español. Si no hay nada para corregir, devolvé la misma pregunta.
+GLOSARIO
+${glossaryText()}
+Respondé SOLO con JSON: {"consulta": "..."}`;
+}
+
+/* ---------- render de la respuesta ---------- */
+function inlineMd(s, claimMap){
+  let h = esc(s);
+  h = h.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  h = h.replace(/\[((?:[FT]\d+)(?:\s*[,;]\s*[FT]\d+)*)\]/g, (m, ids) => ids.split(/\s*[,;]\s*/).map(id => {
+    const c = claimMap.get(id); return c ? " " + tcChip(c.doc, c.ts) : "";
+  }).join(""));
+  return h;
+}
+function blockMd(s, claimMap){
+  const lines = String(s||"").split("\n"); let html = "", list = null;
+  const close = () => { if (list){ html += `</${list}>`; list = null; } };
+  for (const raw of lines){
+    const l = raw.trim();
+    if (!l){ close(); continue; }
+    let m;
+    if ((m = l.match(/^\d+[.)]\s+(.*)/))){ if (list !== "ol"){ close(); html += "<ol>"; list = "ol"; } html += `<li>${inlineMd(m[1], claimMap)}</li>`; }
+    else if ((m = l.match(/^[-•]\s+(.*)/))){ if (list !== "ul"){ close(); html += "<ul>"; list = "ul"; } html += `<li>${inlineMd(m[1], claimMap)}</li>`; }
+    else { close(); html += `<p>${inlineMd(l, claimMap)}</p>`; }
+  }
+  close(); return html;
+}
+function renderSteps(states){
+  const el = $("#steps"); el.hidden = false;
+  el.innerHTML = states.map(([txt, st]) => `<li class="${st}">${esc(txt)}</li>`).join("");
+}
+function renderNoInfo(q, extra){
+  $("#out").innerHTML = `<article class="answer"><h2 class="q">${esc(q)}</h2><p class="nodata">${SIN_INFO}</p>
+  <p class="nodata-sub">${esc(extra || "La consulta quedó anotada en \"Sin respuesta\" para sumarla a la wiki.")}</p></article>`;
+}
+function renderAnswer(q, res, claims){
+  const claimMap = new Map(claims.map(c => [c.id, c]));
+  const used = new Set((JSON.stringify(res).match(/[FT]\d+/g)) || []);
+  const cited = claims.filter(c => used.has(c.id));
+  const srcs = (cited.length ? cited : claims).slice().sort((a,b) => a.doc.localeCompare(b.doc) || toSec(a.ts) - toSec(b.ts));
+  const seen = new Set();
+  const srcHtml = srcs.filter(c => { const k = c.doc + c.ts; if (seen.has(k)) return false; seen.add(k); return true; }).map(c => {
+    const d = WIKI.documentos.find(x => x.id === c.doc);
+    return `<div class="src">${tcChip(c.doc, c.ts)}<div class="meta"><b>${esc(d.titulo)}</b> · ${esc(c.secTitle || "")}</div></div>`;
+  }).join("");
+  const vf = mode !== "tecnica" ? `<div class="view f"><h3>Vista funcional</h3><p>${res.vista_funcional ? inlineMd(res.vista_funcional, claimMap) : "Sin aspectos funcionales en la wiki."}</p></div>` : "";
+  const vt = mode !== "funcional" ? `<div class="view t"><h3>Vista técnica</h3><p>${res.vista_tecnica ? inlineMd(res.vista_tecnica, claimMap) : "Sin aspectos técnicos en la wiki."}</p></div>` : "";
+  $("#out").innerHTML = `<article class="answer"><h2 class="q">${esc(q)}</h2>
+    <div class="body">${blockMd(res.respuesta, claimMap)}</div>
+    <div class="views">${vf}${vt}</div>
+    <div class="sources"><h3>Dónde se encontró</h3>${srcHtml}</div>
+    <div class="foot"><span>Respuesta armada solo con la wiki. Cada minuto fue verificado contra el documento.</span>
+      <span class="fb" id="fb"><button type="button" data-v="1" aria-pressed="false">Me sirvió</button> <button type="button" data-v="0" aria-pressed="false">No me sirvió</button></span></div>
+  </article>`;
+  $("#fb").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; $("#fb").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); saveFeedback(q, b.dataset.v === "1"); });
+}
+
+/* ---------- flujo de consulta ---------- */
+async function ask(q){
+  q = q.trim(); if (!q || busy) return;
+  busy = true; $("#go").disabled = true; $("#stop").hidden = false; $("#out").innerHTML = "";
+  ctl = new AbortController();
+  const runF = mode !== "tecnica", runT = mode !== "funcional";
+  const st = [["Buscando en el índice de la wiki", "run"], ["Agente funcional", runF ? "" : "skip"], ["Agente técnico", runT ? "" : "skip"], ["Verificando minutos y armando la respuesta", ""]];
+  renderSteps(st);
+  try{
+    let hits = search(q);
+    if (!hits.length && sample){
+      st[0][0] = "Reformulando la consulta con el glosario"; renderSteps(st);
+      try { const r = await sample.json(rewritePrompt(q), {modelTier:"quick", signal: ctl.signal}); if (r && r.consulta) hits = search(r.consulta); } catch(e){ if (e.code === "cancelled") throw e; }
+    }
+    st[0][1] = "done"; renderSteps(st);
+    if (!hits.length){ $("#steps").hidden = true; renderNoInfo(q); logGap(q); remember(q, false); return; }
+    if (!sample){ throw {code:"no_sample"}; }
+
+    const secs = sectionsFor(hits), ctx = contextText(secs);
+    if (runF) st[1][1] = "run"; if (runT) st[2][1] = "run"; renderSteps(st);
+    const call = kind => sample.json(agentPrompt(kind, q, ctx), {signal: ctl.signal}).then(r => { st[kind === "funcional" ? 1 : 2][1] = "done"; renderSteps(st); return r; });
+    const [rf, rt] = await Promise.all([runF ? call("funcional") : null, runT ? call("tecnico") : null]);
+
+    st[3][1] = "run"; renderSteps(st);
+    const claims = [];
+    const secTitleFor = (doc, ts) => { const d = WIKI.documentos.find(x=>x.id===doc); const s = d && d.secciones.find(s => s.texto.includes("[" + ts) || s.texto.includes(" " + ts + " |")); return s ? s.titulo : ""; };
+    const add = (r, kind, p) => (r && !r.sin_evidencia && Array.isArray(r.afirmaciones) ? r.afirmaciones : []).forEach(a => {
+      const ts = String(a.ts||"").replace(/[\[\]\s]/g, ""), doc = String(a.doc||"").replace(/^doc:/, "");
+      if (!INDEX.valid[doc] || !INDEX.valid[doc].has(ts) || !a.texto) return; // cita no verificable: se descarta
+      claims.push({id: p + (claims.filter(c=>c.kind===kind).length + 1), kind, texto: String(a.texto), doc, ts, secTitle: secTitleFor(doc, ts)});
+    });
+    add(rf, "funcional", "F"); add(rt, "tecnico", "T");
+    if (!claims.length){ $("#steps").hidden = true; renderNoInfo(q); logGap(q); remember(q, false); return; }
+    const res = await sample.json(synthPrompt(q, claims, {ambas:"funcional y técnica", funcional:"solo funcional", tecnica:"solo técnica"}[mode]), {signal: ctl.signal, modelTier:"quick"});
+    st[3][1] = "done"; renderSteps(st);
+    renderAnswer(q, res && res.respuesta ? res : {respuesta: claims.map(c => `- ${c.texto} [${c.id}]`).join("\n")}, claims);
+    $("#steps").hidden = true; remember(q, true);
+  } catch(e){
+    $("#steps").hidden = true;
+    const msg = {cancelled:"Consulta detenida.", not_granted:"Para responder, el portal necesita permiso para usar Claude con tu cuenta. Podés darlo desde el menú de permisos de esta página.", sampling_disabled:"Claude no está disponible para tu cuenta. Igual podés usar Explorar videos y Glosario.", no_sample:"Esta vista no puede consultar a Claude. Abrí el portal desde claude.ai para hacer preguntas; Explorar videos y Glosario funcionan igual.", rate_limited:"Se hicieron muchas consultas seguidas. Esperá un momento y volvé a intentar.", invalid_json:"La respuesta llegó incompleta. Probá de nuevo o reformulá la pregunta."}[e && e.code] || "No se pudo completar la consulta. Probá de nuevo en un momento.";
+    $("#out").innerHTML = `<p class="note ${e && e.code === "cancelled" ? "" : "err"}">${esc(msg)}</p>`;
+  } finally {
+    busy = false; $("#go").disabled = false; $("#stop").hidden = true;
+  }
+}
+function remember(q, ok){
+  if (history.some(h => h.q === q)) return;
+  history.unshift({q, ok}); $("#history").hidden = false;
+  $("#histlist").innerHTML = history.slice(0, 8).map(h => `<li><button type="button" data-q="${esc(h.q)}">${esc(h.q)}</button>${h.ok ? "" : ' <span class="note">· sin respuesta</span>'}</li>`).join("");
+}
+
+/* ---------- datos compartidos ---------- */
+async function logGap(q){
+  if (!db) return;
+  const id = noAcc(q.toLowerCase()).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 120) || "consulta";
+  try{
+    const ref = db.collection("huecos").doc(id);
+    const snap = await ref.get();
+    if (snap.exists) await ref.update({veces: (snap.data().veces || 1) + 1, ultima: new Date().toISOString()});
+    else await ref.set({pregunta: q, veces: 1, creada: new Date().toISOString(), ultima: new Date().toISOString(), estado: "abierta"});
+  }catch(e){ /* sin permiso de escritura: no se registra */ }
+}
+async function saveFeedback(q, util){
+  if (!db){ toast("Gracias"); return; }
+  try { await db.collection("feedback").add({pregunta: q, util, fecha: new Date().toISOString(), modo: mode}); toast("Gracias, quedó registrado"); }
+  catch(e){ toast("Gracias"); }
+}
+function renderGaps(docs){
+  const open = docs.filter(d => (d.data().estado || "abierta") === "abierta");
+  $("#gapcount").textContent = open.length ? open.length : "";
+  const canFix = EDITOR;
+  $("#gaplist").innerHTML = docs.length ? docs.map(d => { const x = d.data(); const done = x.estado === "resuelta";
+    return `<div class="gap"><span style="${done ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(x.pregunta)} <span class="note">· ${x.veces || 1} ${x.veces > 1 ? "veces" : "vez"}</span></span>
+    <span style="display:flex;gap:8px;align-items:baseline"><span class="when">${esc((x.ultima||"").slice(0,10))}</span>${canFix && !done ? `<button class="btn" type="button" data-resolve="${esc(d.id)}" style="padding:.15rem .6rem;font-size:.78rem">Marcar resuelta</button>` : ""}</span></div>`; }).join("")
+    : `<div class="empty">Todavía no hay consultas sin respuesta. Cuando la wiki no pueda responder algo, va a aparecer acá.</div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-resolve]"); if (!b || !db) return;
+  try { await db.collection("huecos").doc(b.dataset.resolve).update({estado: "resuelta"}); } catch(_) { toast("No se pudo actualizar"); }
+});
+
+/* ---------- Explorar y Glosario ---------- */
+function sectionHtml(doc, txt){
+  const blocks = txt.split(/\n\s*\n/); let html = "";
+  for (const b of blocks){
+    const t = b.trim(); if (!t) continue;
+    const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/`([^`]+)`/g,"<code>$1</code>")
+      .replace(/\[(\d{1,2}:\d{2}(?::\d{2})?)(?:[–-]\d{1,2}:\d{2}(?::\d{2})?)?\]/g, (m, ts) => tcChip(doc, ts));
+    if (t.startsWith("|")){
+      const rows = t.split("\n").filter(r => !/^\|\s*-/.test(r));
+      html += `<div class="tbl"><table>${rows.map((r,i) => "<tr>" + r.split("|").slice(1,-1).map(c => i ? `<td>${fmt(c.trim())}</td>` : `<th>${fmt(c.trim())}</th>`).join("") + "</tr>").join("")}</table></div>`;
+    } else if (t.startsWith(">")){
+      html += `<blockquote>${t.split("\n").map(l => fmt(l.replace(/^>\s?/, ""))).join("<br>")}</blockquote>`;
+    } else if (/^(\d+\.|-)\s/.test(t)){
+      const ordered = /^\d+\./.test(t);
+      html += `<${ordered?"ol":"ul"}>${t.split("\n").map(l => `<li>${fmt(l.replace(/^(\d+\.|-)\s+/, ""))}</li>`).join("")}</${ordered?"ol":"ul"}>`;
+    } else html += `<p>${fmt(t).replace(/\n/g,"<br>")}</p>`;
+  }
+  return html;
+}
+function renderExplore(){
+  const docs = WIKI.documentos.slice().sort((a,b) => (b.fecha||"0").localeCompare(a.fecha||"0"));
+  let html = docs.map(d => {
+    const temas = d.secciones.filter(s => s.num != null);
+    return `<article class="video"><h2>${esc(d.titulo)}</h2>
+      <div class="vm"><span>${esc(d.fecha || "sin fecha")}</span><span>${esc(d.duracion || "")}</span><span class="dom ${esc(d.dominio)}">${esc(d.dominio)}</span><code>${esc(d.video)}</code></div>
+      <p class="desc">${esc(d.descripcion)}</p>
+      ${temas.map(s => `<details class="tema"><summary><span class="tn">${s.num}</span><span class="tt">${esc(s.titulo)}</span>${s.desde ? tcChip(d.id, s.desde) : ""}<span class="dom ${esc(s.dominio)}">${esc(s.dominio)}</span></summary><div class="tema-body">${sectionHtml(d.id, s.texto)}</div></details>`).join("")}
+    </article>`;
+  }).join("");
+  html += `<div class="pend"><span class="label">Grabaciones todavía sin procesar (${WIKI.sin_procesar.length})</span><ul>${WIKI.sin_procesar.map(v => `<li>${esc(v)}</li>`).join("")}</ul></div>`;
+  $("#p-explorar").innerHTML = html;
+}
+function termRows(){
+  const rows = [];
+  for (const d of WIKI.documentos){
+    const s = d.secciones.find(x => x.h2 === "Términos detectados"); if (!s) continue;
+    for (const l of s.texto.split("\n")){
+      if (!l.startsWith("|") || /^\|\s*(Término|-)/.test(l)) continue;
+      const c = l.split("|").slice(1,-1).map(x => x.trim());
+      if (c.length < 4) continue;
+      const ts = (c[3].match(TS_RE) || [])[1];
+      rows.push({term: c[0], aud: c[1], def: c[2], doc: d.id, ts});
+    }
+  }
+  return rows.sort((a,b) => a.term.localeCompare(b.term, "es"));
+}
+let TERMS = [];
+function renderGlossary(filter){
+  const f = noAcc((filter||"").toLowerCase());
+  const m = x => !f || noAcc(Object.values(x).join(" ").toLowerCase()).includes(f);
+  const tr = TERMS.filter(m), gl = WIKI.glosario.filter(m);
+  const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/`([^`]+)`/g,"<code>$1</code>");
+  $("#glist").innerHTML =
+    `<h2 class="sec">Términos del proyecto</h2>` + (tr.length ? `<div class="gl">${tr.map(t => `<div class="row"><div class="term">${fmt(t.term)}<span class="aud">${esc(t.aud)}</span></div><div class="def">${fmt(t.def)} ${t.ts ? tcChip(t.doc, t.ts) : ""}</div></div>`).join("")}</div>` : `<div class="empty">Ningún término coincide.</div>`) +
+    `<h2 class="sec">Cómo suena la jerga en las transcripciones</h2>` + (gl.length ? `<div class="gl">${gl.map(g => `<div class="row"><div class="term">${fmt(g.es)}</div><div class="def"><span class="aud" style="margin:0">${esc(g.audio)}</span>${g.nota ? `<span class="note">${fmt(g.nota)}</span>` : ""}</div></div>`).join("")}</div>` : `<div class="empty">Nada coincide.</div>`);
+}
+
+/* ---------- configuración de links ---------- */
+function renderCfg(){
+  $("#cfg").hidden = false;
+  $("#cfgform").innerHTML = WIKI.documentos.map(d => `<label for="v-${esc(d.id)}">${esc(d.titulo)}</label><input id="v-${esc(d.id)}" data-doc="${esc(d.id)}" type="url" placeholder="https://…sharepoint.com/… o link a la grabación" value="${esc(VIDEO_LINKS[d.id] || "")}">`).join("");
+}
+$("#cfgsave").addEventListener("click", async () => {
+  const map = {}; $("#cfgform").querySelectorAll("input").forEach(i => { if (i.value.trim()) map[i.dataset.doc] = i.value.trim(); });
+  try { await db.doc("config/videos").set({links: map, actualizado: new Date().toISOString()}); toast("Links guardados"); }
+  catch(e){ toast("No se pudieron guardar los links"); }
+});
+
+/* ---------- UI general ---------- */
+document.querySelector("nav.tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]"); if (!b) return;
+  document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  for (const id of ["consultar","explorar","glosario","huecos"]) $("#p-" + id).hidden = id !== b.dataset.tab;
+  try { localStorage.setItem("wiki-tab", b.dataset.tab); } catch(_){}
+});
+document.querySelector(".seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; mode = b.dataset.mode;
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b));
+});
+$("#askform").addEventListener("submit", e => { e.preventDefault(); ask($("#q").value); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); ask($("#q").value); } });
+$("#stop").addEventListener("click", () => ctl && ctl.abort());
+document.addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (!b) return; $("#q").value = b.dataset.q; ask(b.dataset.q); });
+$("#gsearch").addEventListener("input", e => renderGlossary(e.target.value));
+
+const SUGERIDAS = ["¿Cómo se hace la validación compuesta?", "¿Qué es un grupo de negocio?", "¿A qué tablas hay que darles permisos al migrar?", "¿Dónde se asigna el usuario en el insert?", "¿Cómo filtro una fecha que tiene hora?", "¿Qué valores lleva Case Restriction?"];
+$("#sugs").innerHTML = SUGERIDAS.map(s => `<button type="button" data-q="${esc(s)}">${esc(s)}</button>`).join("");
+
+async function boot(){
+  try { WIKI = await (await fetch("wiki.json")).json(); }
+  catch(e){ $("#out").innerHTML = `<p class="note err">No se pudo cargar la wiki. Recargá la página.</p>`; return; }
+  buildIndex(); TERMS = termRows();
+  const temas = WIKI.documentos.reduce((n,d) => n + d.secciones.filter(s => s.num != null).length, 0);
+  $("#stats").innerHTML = `<span><b>${WIKI.documentos.length}</b> videos</span><span><b>${temas}</b> temas</span><span><b>${TERMS.length}</b> términos</span>`;
+  renderExplore(); renderGlossary("");
+  try { const t = localStorage.getItem("wiki-tab"); if (t && t !== "consultar") document.querySelector(`nav.tabs button[data-tab="${t}"]`)?.click(); } catch(_){}
+
+  if (!window.claude) return;
+  claude.use("sample").then(s => { sample = s; });
+  claude.use("user").then(async u => { user = u; EDITOR = u ? await u.canEdit().catch(() => false) : false; if (EDITOR && db){ renderCfg(); renderGaps(GAPDOCS); } });
+  claude.use("db").then(d => {
+    db = d;
+    if (!d){ $("#gaplist").innerHTML = `<div class="empty">El registro compartido no está disponible en esta vista.</div>`; return; }
+    d.collection("huecos").orderBy("ultima", "desc").limit(100).onSnapshot(snap => { GAPDOCS = snap.docs; renderGaps(GAPDOCS); }, () => { $("#gaplist").innerHTML = `<div class="empty">No se pudo leer el registro.</div>`; });
+    d.doc("config/videos").onSnapshot(s => {
+      VIDEO_LINKS = (s.exists && s.data().links) || {};
+      renderExplore(); renderGlossary($("#gsearch").value);
+      if (EDITOR) renderCfg();
+    }, () => {});
+  });
+}
+boot();
+})();
+</script>
