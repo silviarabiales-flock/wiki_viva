@@ -1,0 +1,22 @@
+# Levanta el backend (modo simulación) y sirve el frontend de demostración.
+#   docker compose up --build
+#   Documentación interactiva de la API: http://localhost:8000/docs
+#   Demo de comunicación:               http://localhost:8080/demo.html
+services:
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    ports: ["8000:8000"]
+    environment:
+      MODO_AGENTES: simulacion          # "claude" a partir de la fase 3
+      SIMULACION_DEMORA_MS: "400"       # para ver las etapas en pantalla
+      AUTH_MODO: desarrollo             # "entra" a partir de la fase 5
+      ROL_DEV_POR_DEFECTO: lector
+      ORIGENES_PERMITIDOS: http://localhost:8080
+      # ANTHROPIC_API_KEY: se carga como secreto en la fase 3; nunca en el repositorio
+    volumes: ["datos:/data"]
+  frontend:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    volumes: ["./frontend:/usr/share/nginx/html:ro"]
+volumes:
+  datos:

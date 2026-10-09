@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo de comunicación – Wiki viva</title>
+<style>
+  :root { --bg:#F4F5F2; --fg:#1A2126; --muted:#5A6570; --line:#D9DDD6; --accent:#0B6B63; --tc:#FAE7B0; --tcf:#5E3E00; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111618; --fg:#E5EAE7; --muted:#9BA7AD; --line:#29343A; --accent:#4FC1B4; --tc:#3A2E10; --tcf:#F3D27E; } }
+  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; max-width:820px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:1.4rem; margin:0 0 4px } .muted { color:var(--muted); font-size:.88rem }
+  form { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 }
+  input, select, button { font:inherit; padding:.45rem .7rem; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit }
+  input { flex:1; min-width:220px } button { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer }
+  ol#etapas { padding-left:1.2rem; font-size:.9rem } #etapas li.listo { color:var(--accent) } #etapas li.omitida { opacity:.5 }
+  .tc { font-family:ui-monospace, monospace; background:var(--tc); color:var(--tcf); padding:0 .35rem; border-radius:4px; font-size:.82rem }
+  pre { background:rgba(127,127,127,.12); padding:10px; border-radius:8px; overflow:auto; font-size:.78rem; max-height:280px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-top:12px }
+</style>
+</head>
+<body>
+  <h1>Demo de comunicación frontend ↔ backend</h1>
+  <p class="muted">Usa <code>api.js</code> contra el backend (<span id="estado">conectando…</span>). Muestra los eventos SSE a medida que llegan y el JSON final.</p>
+  <form id="f">
+    <input id="q" value="¿Cómo se hace la validación compuesta?" aria-label="Pregunta">
+    <select id="vista" aria-label="Vista"><option value="ambas">Funcional + técnica</option><option value="funcional">Funcional</option><option value="tecnica">Técnica</option></select>
+    <button>Preguntar</button>
+  </form>
+  <div class="card"><b>Eventos recibidos</b><ol id="etapas"></ol></div>
+  <div class="card" id="resp" hidden><b>Respuesta</b><div id="texto"></div><div id="citas"></div></div>
+  <div class="card"><b>JSON del resultado</b><pre id="json">—</pre></div>
+<script type="module">
+  import { crearApi } from "./api.js";
+  const base = new URLSearchParams(location.search).get("api") || "http://localhost:8000";
+  const api = crearApi({ base, rolDev: "lector", usuarioDev: "demo" });
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  api.salud().then(s => $("#estado").textContent = `${base} · modo ${s.modo_agentes} · ${s.videos} videos`)
+             .catch(() => $("#estado").textContent = `sin conexión con ${base}`);
+  $("#f").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("#etapas").innerHTML = ""; $("#resp").hidden = true; $("#json").textContent = "…";
+    try {
+      const res = await api.consultar($("#q").value, {
+        vista: $("#vista").value,
+        onEtapa: ({ etapa, estado }) => {
+          const li = document.createElement("li"); li.className = estado; li.textContent = `${etapa}: ${estado}`;
+          $("#etapas").appendChild(li);
+        },
+      });
+      $("#json").textContent = JSON.stringify(res, null, 2);
+      $("#resp").hidden = false;
+      const cita = new Map(res.citas.map(c => [c.id, c]));
+      $("#texto").innerHTML = esc(res.respuesta).replace(/\n/g, "<br>")
+        .replace(/\[([FT]\d+)\]/g, (m, id) => cita.has(id) ? ` <span class="tc">${cita.get(id).minuto}</span>` : m);
+      $("#citas").innerHTML = res.citas.map(c => `<div class="muted"><span class="tc">${c.minuto}</span> ${esc(c.titulo)} › ${esc(c.seccion)} (${c.agente})</div>`).join("");
+    } catch (err) {
+      $("#json").textContent = `Error ${err.codigo}: ${err.message}`;
+    }
+  });
+</script>
+</body>
+</html>

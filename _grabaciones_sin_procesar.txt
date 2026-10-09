@@ -1,0 +1,22 @@
+# Grabaciones todavía sin procesar (una por línea). Datos ficticios.
+Charla técnica modernización 01
+Charla técnica modernización 02
+Charla técnica modernización 03
+Charla técnica modernización 05
+Charla técnica – 2ª parte (1)
+Charla técnica – 2ª parte (2)
+Reunión técnica 2026-02-03
+Reunión técnica 2026-02-10
+Reunión técnica 2026-02-24
+Revisión de avance 2026-03-03
+Reunión técnica 2026-03-10
+Reunión técnica 2026-03-17
+Revisión de avance 2026-03-24
+Reunión técnica 2026-03-31
+Revisión de avance 2026-04-07
+Reunión técnica 2026-04-14
+Revisión de avance 2026-04-21
+Reunión técnica 2026-04-28
+Revisión de avance 2026-05-05
+Reunión técnica 2026-05-19
+Acuerdos de trabajo 2026-06-30

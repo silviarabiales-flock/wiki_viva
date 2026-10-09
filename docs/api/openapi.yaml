@@ -1,0 +1,388 @@
+openapi: 3.1.0
+info:
+  title: Wiki viva – API de consulta
+  version: 0.2.0
+  description: |
+    Contrato entre el frontend (portal) y el backend de la Wiki viva de consulta de
+    terminología técnica y funcional.
+
+    - El backend es el único que lee la wiki OKF completa y el único que llama a la API de Claude.
+    - El frontend solo muestra lo que recibe.
+    - Autenticación: token Bearer de Microsoft Entra ID (fase 5). En desarrollo, el
+      header `X-Rol-Dev` simula el rol (`lector`, `colaborador`, `editor`).
+    - Roles: `lector` < `colaborador` < `editor`.
+    - Todos los errores usan el esquema `Error`.
+    - Los minutos se devuelven como `hh:mm:ss` y en segundos.
+servers:
+  - url: http://localhost:8000
+    description: Desarrollo local
+tags:
+  - name: consultas
+  - name: wiki
+  - name: huecos
+  - name: configuracion
+  - name: sistema
+
+paths:
+  /api/salud:
+    get:
+      tags: [sistema]
+      summary: Estado del servicio
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Salud" }
+
+  /api/consultas:
+    post:
+      tags: [consultas]
+      summary: Hacer una pregunta a la wiki
+      description: |
+        Rol mínimo: `lector`.
+
+        Con `Accept: text/event-stream`, la respuesta llega en streaming (SSE) con eventos
+        `etapa` y, al final, un único evento `resultado` (o `error`). Con
+        `Accept: application/json`, se devuelve directamente el `ResultadoConsulta`.
+
+        Si no hay evidencia, `sin_informacion` es `true`, la respuesta es exactamente
+        "No tengo información sobre tu consulta" y el backend registra la pregunta como hueco.
+
+        Eventos SSE (en este orden):
+        - `etapa` `{"etapa":"busqueda","estado":"en_curso|listo"}`
+        - `etapa` `{"etapa":"funcional","estado":"en_curso|listo|omitida"}`
+        - `etapa` `{"etapa":"tecnico","estado":"en_curso|listo|omitida"}`
+        - `etapa` `{"etapa":"verificacion","estado":"en_curso|listo"}`
+        - `etapa` `{"etapa":"sintesis","estado":"en_curso|listo"}`
+        - `resultado` ResultadoConsulta
+        - o `error` Error (termina el stream)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PedidoConsulta" }
+            example: { pregunta: "¿Cómo se hace la validación compuesta?", vista: ambas }
+      responses:
+        "200":
+          description: Resultado (JSON) o stream de eventos (SSE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultadoConsulta" }
+            text/event-stream:
+              schema:
+                type: string
+                description: Eventos SSE `etapa`, `resultado` o `error`.
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+
+  /api/consultas/{consulta_id}/opinion:
+    post:
+      tags: [consultas]
+      summary: Registrar si la respuesta sirvió
+      description: Rol mínimo `colaborador`. Una opinión por usuario y consulta; la última reemplaza a la anterior.
+      parameters:
+        - { name: consulta_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PedidoOpinion" }
+      responses:
+        "204": { description: Registrada }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/wiki/indice:
+    get:
+      tags: [wiki]
+      summary: Videos y temas, para Explorar
+      description: Rol mínimo `lector`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Indice" }
+
+  /api/wiki/videos/{video_id}:
+    get:
+      tags: [wiki]
+      summary: Texto de un video, por tema
+      description: Rol mínimo `lector`.
+      parameters:
+        - { name: video_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Video" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/glosario:
+    get:
+      tags: [wiki]
+      summary: Términos del proyecto y jerga de las transcripciones
+      description: Rol mínimo `lector`. `q` filtra sin distinguir mayúsculas ni tildes.
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Glosario" }
+
+  /api/huecos:
+    get:
+      tags: [huecos]
+      summary: Preguntas sin respuesta
+      description: Rol mínimo `lector`. Ordenadas por última vez preguntada (más reciente primero).
+      parameters:
+        - { name: estado, in: query, required: false, schema: { type: string, enum: [abierta, resuelta] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [huecos]
+                properties:
+                  huecos: { type: array, items: { $ref: "#/components/schemas/Hueco" } }
+
+  /api/huecos/{hueco_id}:
+    patch:
+      tags: [huecos]
+      summary: Cambiar el estado de un hueco
+      description: Rol mínimo `editor`.
+      parameters:
+        - { name: hueco_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [abierta, resuelta] }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hueco" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/config/videos:
+    get:
+      tags: [configuracion]
+      summary: Links de las grabaciones
+      description: Rol mínimo `lector`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinksVideos" }
+    put:
+      tags: [configuracion]
+      summary: Reemplazar los links de las grabaciones
+      description: Rol mínimo `editor`. Solo se aceptan URLs http(s) y ids de video existentes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinksVideos" }
+      responses:
+        "200":
+          description: Guardado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinksVideos" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    entraId:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [codigo, mensaje]
+          properties:
+            codigo:
+              type: string
+              enum: [consulta_invalida, no_autorizado, sin_permiso, no_encontrado, limite_consultas, servicio_no_disponible, error_interno]
+            mensaje: { type: string }
+      example: { error: { codigo: sin_permiso, mensaje: "Esta acción requiere el rol editor." } }
+
+    Salud:
+      type: object
+      required: [estado, modo_agentes, videos, version]
+      properties:
+        estado: { type: string, enum: [ok] }
+        modo_agentes: { type: string, enum: [simulacion, claude] }
+        videos: { type: integer }
+        version: { type: string }
+
+    PedidoConsulta:
+      type: object
+      required: [pregunta]
+      properties:
+        pregunta: { type: string, minLength: 3, maxLength: 500 }
+        vista: { type: string, enum: [ambas, funcional, tecnica], default: ambas }
+
+    Cita:
+      type: object
+      required: [id, agente, video_id, titulo, seccion, minuto, segundos, texto]
+      properties:
+        id: { type: string, description: "F1, F2… (funcional) o T1, T2… (técnico); se referencia en el texto como [T1]", example: T1 }
+        agente: { type: string, enum: [funcional, tecnico] }
+        video_id: { type: string }
+        titulo: { type: string }
+        seccion: { type: string }
+        minuto: { type: string, pattern: "^\\d{2}:\\d{2}:\\d{2}$", example: "00:07:43" }
+        segundos: { type: integer, example: 463 }
+        texto: { type: string, description: Afirmación respaldada por ese minuto }
+        url_video: { type: [string, "null"], description: Link a la grabación en ese segundo, si hay link configurado }
+
+    ResultadoConsulta:
+      type: object
+      required: [consulta_id, pregunta, vista, sin_informacion, respuesta, citas, modo_agentes]
+      properties:
+        consulta_id: { type: string }
+        pregunta: { type: string }
+        vista: { type: string, enum: [ambas, funcional, tecnica] }
+        sin_informacion: { type: boolean }
+        respuesta: { type: string, description: "Markdown simple con referencias [F1]/[T1] a las citas" }
+        vista_funcional: { type: [string, "null"] }
+        vista_tecnica: { type: [string, "null"] }
+        citas: { type: array, items: { $ref: "#/components/schemas/Cita" } }
+        modo_agentes: { type: string, enum: [simulacion, claude] }
+
+    PedidoOpinion:
+      type: object
+      required: [util]
+      properties:
+        util: { type: boolean }
+        comentario: { type: string, maxLength: 500 }
+
+    TemaIndice:
+      type: object
+      required: [numero, titulo, desde, hasta, dominio]
+      properties:
+        numero: { type: integer }
+        titulo: { type: string }
+        desde: { type: string, example: "00:06:51" }
+        hasta: { type: string, example: "00:10:42" }
+        dominio: { type: string, enum: [funcional, tecnico, ambos] }
+
+    VideoResumen:
+      type: object
+      required: [id, titulo, dominio, temas]
+      properties:
+        id: { type: string }
+        titulo: { type: string }
+        fecha: { type: [string, "null"], format: date }
+        duracion: { type: [string, "null"] }
+        dominio: { type: string }
+        descripcion: { type: [string, "null"] }
+        archivo_video: { type: string }
+        url_video: { type: [string, "null"] }
+        temas: { type: array, items: { $ref: "#/components/schemas/TemaIndice" } }
+
+    Indice:
+      type: object
+      required: [titulo, videos, sin_procesar]
+      properties:
+        titulo: { type: string }
+        videos: { type: array, items: { $ref: "#/components/schemas/VideoResumen" } }
+        sin_procesar: { type: array, items: { type: string } }
+
+    Seccion:
+      type: object
+      required: [titulo, tipo, texto]
+      properties:
+        numero: { type: [integer, "null"] }
+        titulo: { type: string }
+        tipo: { type: string, enum: [tema, resumen, terminos, reglas] }
+        desde: { type: [string, "null"] }
+        hasta: { type: [string, "null"] }
+        dominio: { type: [string, "null"] }
+        texto: { type: string, description: "Markdown con minutos [m:ss]" }
+
+    Video:
+      allOf:
+        - $ref: "#/components/schemas/VideoResumen"
+        - type: object
+          required: [secciones]
+          properties:
+            secciones: { type: array, items: { $ref: "#/components/schemas/Seccion" } }
+
+    Termino:
+      type: object
+      required: [termino, variantes_audio, significado, video_id]
+      properties:
+        termino: { type: string }
+        variantes_audio: { type: string }
+        significado: { type: string }
+        video_id: { type: string }
+        minuto: { type: [string, "null"] }
+
+    Jerga:
+      type: object
+      required: [audio, significado]
+      properties:
+        audio: { type: string }
+        significado: { type: string }
+        nota: { type: [string, "null"] }
+
+    Glosario:
+      type: object
+      required: [terminos, jerga]
+      properties:
+        terminos: { type: array, items: { $ref: "#/components/schemas/Termino" } }
+        jerga: { type: array, items: { $ref: "#/components/schemas/Jerga" } }
+
+    Hueco:
+      type: object
+      required: [id, pregunta, veces, estado, creada, ultima]
+      properties:
+        id: { type: string }
+        pregunta: { type: string }
+        veces: { type: integer }
+        estado: { type: string, enum: [abierta, resuelta] }
+        creada: { type: string, format: date-time }
+        ultima: { type: string, format: date-time }
+
+    LinksVideos:
+      type: object
+      required: [links]
+      properties:
+        links:
+          type: object
+          additionalProperties: { type: string, format: uri }
+          example: { "capacitacion-validacion-compuesta-campo-fecha-2026-05-12": "https://empresa.sharepoint.com/..." }
+
+security:
+  - entraId: []

@@ -30,6 +30,12 @@ portal/
   wiki.json                 Datos del portal, generados desde wiki/
 scripts/
   build_wiki_json.py        Regenera portal/wiki.json a partir de wiki/
+backend/                    API (FastAPI): búsqueda, agentes, verificación, datos. Ver backend/README.md
+frontend/
+  api.js                    Cliente del backend (único punto de comunicación)
+  demo.html                 Demo de comunicación frontend ↔ backend
+docs/api/openapi.yaml       Contrato de la API
+docker-compose.yml          Levanta backend + demo en local
 ```
 
 ## Uso rápido
@@ -52,7 +58,7 @@ El buscador devuelve las secciones y los minutos (`hh:mm:ss`) donde está la res
 
 `portal/index.html` es un artifact de claude.ai. Usa capacidades propias de esa plataforma: `sample` para los agentes, `db` para guardar las preguntas sin respuesta y las opiniones, y `user`. Por eso, abierto fuera de claude.ai, solo funcionan **Explorar videos** y **Glosario**.
 
-Para consultarlo por fuera de Claude hace falta un backend propio. Ese backend reutilizaría `consulta_okf.py`, haría las tres llamadas a la API de Claude (agente funcional, agente técnico y síntesis) y guardaría la clave de la API del lado del servidor. Es un paso pendiente de este prototipo.
+Para consultarlo por fuera de Claude está en marcha la separación en backend y frontend; el detalle está en [`backend/README.md`](backend/README.md). Hoy están listos el contrato de la API, el backend en modo simulación (sin costo de API) con sus tests y una demo de comunicación (`docker compose up --build`). Faltan los agentes reales con Claude, la adaptación del portal, el inicio de sesión con Microsoft y el despliegue.
 
 ## Formato OKF usado
 
